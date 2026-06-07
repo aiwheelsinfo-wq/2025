@@ -1,0 +1,42 @@
+[11-Apr-2026 13:16:40 Asia/Kolkata] PHP Warning:  file_get_contents(service-account.json): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 29
+[11-Apr-2026 13:16:40 Asia/Kolkata] PHP Warning:  Trying to access array offset on value of type null in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 39
+[11-Apr-2026 13:16:40 Asia/Kolkata] PHP Warning:  Trying to access array offset on value of type null in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 41
+[11-Apr-2026 13:16:40 Asia/Kolkata] PHP Warning:  Trying to access array offset on value of type null in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 50
+[11-Apr-2026 13:16:40 Asia/Kolkata] PHP Warning:  openssl_sign(): Supplied key param cannot be coerced into a private key in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 51
+[11-Apr-2026 13:16:40 Asia/Kolkata] PHP Warning:  Trying to access array offset on value of type null in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 59
+[11-Apr-2026 13:19:50 Asia/Kolkata] PHP Warning:  file_get_contents(service-account.json): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 29
+[11-Apr-2026 13:19:50 Asia/Kolkata] PHP Warning:  Trying to access array offset on value of type null in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 39
+[11-Apr-2026 13:19:50 Asia/Kolkata] PHP Warning:  Trying to access array offset on value of type null in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 41
+[11-Apr-2026 13:19:50 Asia/Kolkata] PHP Warning:  Trying to access array offset on value of type null in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 50
+[11-Apr-2026 13:19:50 Asia/Kolkata] PHP Warning:  openssl_sign(): Supplied key param cannot be coerced into a private key in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 51
+[11-Apr-2026 13:19:50 Asia/Kolkata] PHP Warning:  Trying to access array offset on value of type null in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 59
+[11-Apr-2026 13:21:37 Asia/Kolkata] PHP Warning:  file_get_contents(service-account.json): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 29
+[11-Apr-2026 13:21:37 Asia/Kolkata] PHP Warning:  Trying to access array offset on value of type null in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 39
+[11-Apr-2026 13:21:37 Asia/Kolkata] PHP Warning:  Trying to access array offset on value of type null in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 41
+[11-Apr-2026 13:21:37 Asia/Kolkata] PHP Warning:  Trying to access array offset on value of type null in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 50
+[11-Apr-2026 13:21:37 Asia/Kolkata] PHP Warning:  openssl_sign(): Supplied key param cannot be coerced into a private key in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 51
+[11-Apr-2026 13:21:37 Asia/Kolkata] PHP Warning:  Trying to access array offset on value of type null in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 59
+[11-Apr-2026 13:25:07 Asia/Kolkata] PHP Warning:  file_get_contents(service-account.json): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 29
+[11-Apr-2026 13:25:07 Asia/Kolkata] PHP Warning:  Trying to access array offset on value of type null in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 39
+[11-Apr-2026 13:25:07 Asia/Kolkata] PHP Warning:  Trying to access array offset on value of type null in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 41
+[11-Apr-2026 13:25:07 Asia/Kolkata] PHP Warning:  Trying to access array offset on value of type null in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 50
+[11-Apr-2026 13:25:07 Asia/Kolkata] PHP Warning:  openssl_sign(): Supplied key param cannot be coerced into a private key in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 51
+[11-Apr-2026 13:25:07 Asia/Kolkata] PHP Warning:  Trying to access array offset on value of type null in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 59
+[11-Apr-2026 13:26:51 Asia/Kolkata] PHP Warning:  file_get_contents(service-account.json): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 29
+[11-Apr-2026 07:58:15 UTC] PHP Parse error:  syntax error, unexpected token ";", expecting ")" in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 29
+[11-Apr-2026 13:28:33 Asia/Kolkata] PHP Warning:  file_get_contents(/home/o96ayd7ennr5/public_html/2025/cust_notification/service-account.json): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 29
+[11-Apr-2026 13:29:09 Asia/Kolkata] PHP Warning:  Undefined array key "client_email" in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 43
+[11-Apr-2026 13:29:09 Asia/Kolkata] PHP Warning:  Undefined array key "token_uri" in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 45
+[11-Apr-2026 13:29:09 Asia/Kolkata] PHP Warning:  Undefined array key "private_key" in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 54
+[11-Apr-2026 13:29:09 Asia/Kolkata] PHP Warning:  openssl_sign(): Supplied key param cannot be coerced into a private key in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 55
+[11-Apr-2026 13:29:09 Asia/Kolkata] PHP Warning:  Undefined array key "token_uri" in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 63
+[11-Apr-2026 13:29:59 Asia/Kolkata] PHP Warning:  Undefined array key "client_email" in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 43
+[11-Apr-2026 13:29:59 Asia/Kolkata] PHP Warning:  Undefined array key "token_uri" in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 45
+[11-Apr-2026 13:29:59 Asia/Kolkata] PHP Warning:  Undefined array key "private_key" in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 54
+[11-Apr-2026 13:29:59 Asia/Kolkata] PHP Warning:  openssl_sign(): Supplied key param cannot be coerced into a private key in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 55
+[11-Apr-2026 13:29:59 Asia/Kolkata] PHP Warning:  Undefined array key "token_uri" in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 63
+[11-Apr-2026 17:40:01 Asia/Kolkata] PHP Warning:  Undefined array key "client_email" in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 43
+[11-Apr-2026 17:40:01 Asia/Kolkata] PHP Warning:  Undefined array key "token_uri" in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 45
+[11-Apr-2026 17:40:01 Asia/Kolkata] PHP Warning:  Undefined array key "private_key" in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 54
+[11-Apr-2026 17:40:01 Asia/Kolkata] PHP Warning:  openssl_sign(): Supplied key param cannot be coerced into a private key in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 55
+[11-Apr-2026 17:40:01 Asia/Kolkata] PHP Warning:  Undefined array key "token_uri" in /home/o96ayd7ennr5/public_html/2025/cust_notification/customer_notification.php on line 63

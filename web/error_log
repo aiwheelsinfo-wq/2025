@@ -1,0 +1,129 @@
+[29-Mar-2025 04:50:01 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:50:01 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:50:01 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function openConnection() in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:5
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 5
+[29-Mar-2025 04:50:27 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:50:27 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:50:27 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function openConnection() in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:5
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 5
+[29-Mar-2025 04:52:39 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:52:39 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:52:39 UTC] PHP Fatal error:  Uncaught Error: Call to undefined function openConnection() in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:5
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 5
+[29-Mar-2025 04:55:57 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:55:57 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:55:57 UTC] PHP Warning:  Undefined variable $conn in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 87
+[29-Mar-2025 04:55:57 UTC] PHP Fatal error:  Uncaught Error: Call to a member function close() on null in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:87
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 87
+[29-Mar-2025 04:57:21 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:57:21 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:57:21 UTC] PHP Warning:  Undefined variable $conn in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 87
+[29-Mar-2025 04:57:21 UTC] PHP Fatal error:  Uncaught Error: Call to a member function close() on null in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:87
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 87
+[29-Mar-2025 04:57:39 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:57:39 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:57:39 UTC] PHP Warning:  Undefined variable $conn in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 87
+[29-Mar-2025 04:57:39 UTC] PHP Fatal error:  Uncaught Error: Call to a member function close() on null in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:87
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 87
+[29-Mar-2025 04:57:44 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:57:44 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:57:44 UTC] PHP Warning:  Undefined variable $conn in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 10
+[29-Mar-2025 04:57:44 UTC] PHP Fatal error:  Uncaught Error: Call to a member function prepare() on null in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:10
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 10
+[29-Mar-2025 04:58:47 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:58:47 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:59:12 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:59:12 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:59:18 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:59:18 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:59:24 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:59:24 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 04:59:24 UTC] PHP Warning:  Undefined variable $conn in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 04:59:24 UTC] PHP Fatal error:  Uncaught Error: Call to a member function prepare() on null in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:11
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:01:28 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:01:28 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:01:28 UTC] PHP Warning:  Undefined variable $conn in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:01:28 UTC] PHP Fatal error:  Uncaught Error: Call to a member function prepare() on null in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:11
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:02:08 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:02:08 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:02:08 UTC] PHP Warning:  Undefined variable $conn in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:02:08 UTC] PHP Fatal error:  Uncaught Error: Call to a member function prepare() on null in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:11
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:02:13 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:02:13 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:02:13 UTC] PHP Warning:  Undefined variable $conn in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:02:13 UTC] PHP Fatal error:  Uncaught Error: Call to a member function prepare() on null in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:11
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:02:15 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:02:15 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:02:15 UTC] PHP Warning:  Undefined variable $conn in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:02:15 UTC] PHP Fatal error:  Uncaught Error: Call to a member function prepare() on null in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:11
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:02:52 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:02:52 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:02:52 UTC] PHP Warning:  Undefined variable $conn in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:02:52 UTC] PHP Fatal error:  Uncaught Error: Call to a member function prepare() on null in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:11
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:03:35 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:03:35 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:03:35 UTC] PHP Warning:  Undefined variable $conn in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:03:35 UTC] PHP Fatal error:  Uncaught Error: Call to a member function prepare() on null in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:11
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:03:38 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:03:38 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:03:38 UTC] PHP Warning:  Undefined variable $conn in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:03:38 UTC] PHP Fatal error:  Uncaught Error: Call to a member function prepare() on null in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:11
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:05:07 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:05:07 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:05:07 UTC] PHP Warning:  Undefined variable $conn in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:05:07 UTC] PHP Fatal error:  Uncaught Error: Call to a member function prepare() on null in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:11
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:05:09 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:05:09 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:05:09 UTC] PHP Warning:  Undefined variable $conn in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:05:09 UTC] PHP Fatal error:  Uncaught Error: Call to a member function prepare() on null in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:11
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:14:08 UTC] PHP Warning:  include(db_connection.php): Failed to open stream: No such file or directory in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:14:08 UTC] PHP Warning:  include(): Failed opening 'db_connection.php' for inclusion (include_path='.:/opt/alt/php81/usr/share/pear:/opt/alt/php81/usr/share/php:/usr/share/pear:/usr/share/php') in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 3
+[29-Mar-2025 05:14:08 UTC] PHP Warning:  Undefined variable $conn in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11
+[29-Mar-2025 05:14:08 UTC] PHP Fatal error:  Uncaught Error: Call to a member function prepare() on null in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php:11
+Stack trace:
+#0 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/web/driver_form.php on line 11

@@ -1,0 +1,80 @@
+[11-Apr-2025 11:15:09 UTC] {"from_address":"Jalaram Niwas, Ganesh Gawade Rd, Mulund West, Mumbai, Maharashtra 400080, India","to_address":"Mulund West, Mumbai, Maharashtra, India","car_type":"SUV","total_amount":"370.00","distance":0.3}
+[11-Apr-2025 11:46:50 UTC] {"from_address":"Jalaram Niwas, Ganesh Gawade Rd, Mulund West, Mumbai, Maharashtra 400080, India","to_address":"Bismillah Chinese Corner, near Usmaniya Baikery, Govandi Slums, Govandi West, Phase II, Shivaji Nagar, Mumbai, Maharashtra, India","car_type":"SUV","total_amount":"590.00","distance":17.3}
+[11-Apr-2025 11:50:55 UTC] {"from_address":"Jalaram Niwas, Ganesh Gawade Rd, Mulund West, Mumbai, Maharashtra 400080, India","to_address":"Mumbai, Maharashtra, India","car_type":"SUV","total_amount":"590.00","distance":18.8}
+[11-Apr-2025 12:03:36 UTC] {"from_address":"Jalaram Niwas, Ganesh Gawade Rd, Mulund West, Mumbai, Maharashtra 400080, India","to_address":"Vashi Railway Station, Navi Mumbai, Maharashtra","car_type":"Hatchback","total_amount":"400.00","distance":21}
+[11-Apr-2025 13:59:48 UTC] {"from_address":"Jalaram Niwas, Ganesh Gawade Rd, Mulund West, Mumbai, Maharashtra 400080, India","to_address":"Bismillah Chinese Corner, near Usmaniya Baikery, Govandi Slums, Govandi West, Phase II, Shivaji Nagar, Mumbai, Maharashtra, India","car_type":"Hatchback","total_amount":"335.00","distance":17.3}
+[11-Apr-2025 14:09:32 UTC] {"from_address":"Jalaram Niwas, Ganesh Gawade Rd, Mulund West, Mumbai, Maharashtra 400080, India","to_address":"Bismillah Chinese Corner, near Usmaniya Baikery, Govandi Slums, Govandi West, Phase II, Shivaji Nagar, Mumbai, Maharashtra, India","car_type":"SUV","total_amount":"590.00","distance":17.3}
+[12-Apr-2025 04:53:16 UTC] {"from_address":"199, NS Rd, Vishwakarma Nagar, Mulund West, Mumbai, Maharashtra 400080, India","to_address":"Mumbai, Maharashtra, India","car_type":"Sedan","total_amount":"400.00","distance":18.8}
+[15-Apr-2025 05:09:12 UTC] {"from_address":"","to_address":"CSMT, Mumbai Samachar Marg, Kala Ghoda, Fort, Mumbai, Maharashtra, India","car_type":"SUV","total_amount":"1030.00","distance":35.2}
+[15-Apr-2025 06:01:18 UTC] {"from_address":"","to_address":"Kurla West, Mumbai, Maharashtra, India","car_type":"Hatchback","total_amount":"335.00","distance":19.1}
+[15-Apr-2025 06:10:29 UTC] {"from_address":"123 Main St, Mumbai, Maharashtra, 400001","to_address":"456 Park Ave, Mumbai, Maharashtra, 400002","car_type":"Sedan","total_amount":"500","distance":10.5}
+[15-Apr-2025 06:34:56 UTC] {"from_address":"Jalaram Niwas, Mumbai, Maharashtra, 400080","to_address":"Chembur Station, Chembur West, BMC Colony, Chedda Nagar, Mumbai, Maharashtra, India","car_type":"Sedan","total_amount":"400.00","distance":16.5}
+[15-Apr-2025 08:13:32 UTC] {"from_address":"ONE WAY CAR SERVIES, Ganesh Gawade Road, Mulund West, Mumbai, Maharashtra, India","to_address":"Kurla West, Mumbai, Maharashtra, India","car_type":"Sedan","total_amount":"400.00","distance":19.1}
+[15-Apr-2025 08:22:49 UTC] {"from_address":"199, Mumbai, Maharashtra, 400080","to_address":"Bhiwandi, Maharashtra, India","car_type":"Hatchback","total_amount":"335.00","distance":17}
+[15-Apr-2025 08:22:49 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'phone_number' in 'INSERT INTO' in /home/o96ayd7ennr5/public_html/2025/agni_taxi/saveLocalTaxi.php:45
+Stack trace:
+#0 /home/o96ayd7ennr5/public_html/2025/agni_taxi/saveLocalTaxi.php(45): mysqli_query()
+#1 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/agni_taxi/saveLocalTaxi.php on line 45
+[15-Apr-2025 08:22:57 UTC] {"from_address":"199, Mumbai, Maharashtra, 400080","to_address":"Bhiwandi, Maharashtra, India","car_type":"Hatchback","total_amount":"335.00","distance":17}
+[15-Apr-2025 08:22:57 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'phone_number' in 'INSERT INTO' in /home/o96ayd7ennr5/public_html/2025/agni_taxi/saveLocalTaxi.php:45
+Stack trace:
+#0 /home/o96ayd7ennr5/public_html/2025/agni_taxi/saveLocalTaxi.php(45): mysqli_query()
+#1 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/agni_taxi/saveLocalTaxi.php on line 45
+[15-Apr-2025 08:23:42 UTC] {"from_address":"199, Mumbai, Maharashtra, 400080","to_address":"Bhiwandi, Maharashtra, India","car_type":"Hatchback","total_amount":"335.00","distance":17}
+[15-Apr-2025 08:23:42 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'phone_number' in 'INSERT INTO' in /home/o96ayd7ennr5/public_html/2025/agni_taxi/saveLocalTaxi.php:45
+Stack trace:
+#0 /home/o96ayd7ennr5/public_html/2025/agni_taxi/saveLocalTaxi.php(45): mysqli_query()
+#1 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/agni_taxi/saveLocalTaxi.php on line 45
+[15-Apr-2025 08:33:30 UTC] {"from_address":"1, Mumbai, Maharashtra, 400080","to_address":"Kurla West, Mumbai, Maharashtra, India","car_type":"SUV","total_amount":"590.00","distance":18.8}
+[15-Apr-2025 08:33:38 UTC] {"from_address":"1, Mumbai, Maharashtra, 400080","to_address":"Kurla West, Mumbai, Maharashtra, India","car_type":"Sedan","total_amount":"400.00","distance":18.8}
+[15-Apr-2025 09:05:25 UTC] {"from_address":"1, Mumbai, Maharashtra, 400080","to_address":"Kurla West, Mumbai, Maharashtra, India","car_type":"Sedan","total_amount":"400.00","distance":18.8}
+[15-Apr-2025 09:16:05 UTC] {"from_address":"Jalaram Niwas, Mumbai, Maharashtra, 400080","to_address":"Mumbai, Maharashtra, India","car_type":"Hatchback","total_amount":"335.00","distance":18.8,"phone_number":"9372696409"}
+[15-Apr-2025 09:16:05 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'phone_number' in 'INSERT INTO' in /home/o96ayd7ennr5/public_html/2025/agni_taxi/saveLocalTaxi.php:46
+Stack trace:
+#0 /home/o96ayd7ennr5/public_html/2025/agni_taxi/saveLocalTaxi.php(46): mysqli_query()
+#1 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/agni_taxi/saveLocalTaxi.php on line 46
+[15-Apr-2025 09:17:37 UTC] {"from_address":"Jalaram Niwas, Mumbai, Maharashtra, 400080","to_address":"Tilaknagar Railway Station, Tilak Nagar, Mumbai, Maharashtra","car_type":"Sedan","total_amount":"400.00","distance":17.5,"phone_number":"9372696409"}
+[15-Apr-2025 09:17:37 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'phone_number' in 'INSERT INTO' in /home/o96ayd7ennr5/public_html/2025/agni_taxi/saveLocalTaxi.php:46
+Stack trace:
+#0 /home/o96ayd7ennr5/public_html/2025/agni_taxi/saveLocalTaxi.php(46): mysqli_query()
+#1 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/agni_taxi/saveLocalTaxi.php on line 46
+[24-Apr-2025 05:35:15 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'suv' in 'SELECT' in /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php:9
+Stack trace:
+#0 /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php(9): mysqli->query()
+#1 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php on line 9
+[24-Apr-2025 05:43:54 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'suv' in 'SELECT' in /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php:9
+Stack trace:
+#0 /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php(9): mysqli->query()
+#1 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php on line 9
+[24-Apr-2025 05:46:47 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'suv' in 'SELECT' in /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php:9
+Stack trace:
+#0 /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php(9): mysqli->query()
+#1 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php on line 9
+[27-Sep-2025 08:30:13 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'phone_number' in 'WHERE' in /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php:17
+Stack trace:
+#0 /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php(17): mysqli->prepare()
+#1 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php on line 17
+[27-Sep-2025 08:31:19 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'phone_number' in 'WHERE' in /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php:17
+Stack trace:
+#0 /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php(17): mysqli->prepare()
+#1 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php on line 17
+[27-Sep-2025 08:34:28 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'phone_number' in 'WHERE' in /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php:17
+Stack trace:
+#0 /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php(17): mysqli->prepare()
+#1 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php on line 17
+[27-Sep-2025 08:34:58 UTC] PHP Fatal error:  Uncaught mysqli_sql_exception: Unknown column 'phone_number' in 'WHERE' in /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php:17
+Stack trace:
+#0 /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php(17): mysqli->prepare()
+#1 {main}
+  thrown in /home/o96ayd7ennr5/public_html/2025/agni_taxi/fetch_fares.php on line 17

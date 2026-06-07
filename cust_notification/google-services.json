@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "704229396210",
+    "project_id": "agni-car-app",
+    "storage_bucket": "agni-car-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:704229396210:android:7ff001942b7660bdde0a6b",
+        "android_client_info": {
+          "package_name": "com.AgniDriver.agnidriver2025"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPxJvzK1HxsvEzPU2omrjUVgKnhKzHrA8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:704229396210:android:f232ecadfce6b1e6de0a6b",
+        "android_client_info": {
+          "package_name": "com.agni.agni_car_rental"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPxJvzK1HxsvEzPU2omrjUVgKnhKzHrA8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:704229396210:android:2b9533bada0622e1de0a6b",
+        "android_client_info": {
+          "package_name": "com.example.fcm_test"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPxJvzK1HxsvEzPU2omrjUVgKnhKzHrA8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
