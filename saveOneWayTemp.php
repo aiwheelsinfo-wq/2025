@@ -106,18 +106,22 @@ function sendFcmMessage($projectId, $message) {
 $projectId = 'agni-car-app';
 $fcm_bookerToken = 'd14kUzAvRSiSGgFXgKr0ki:APA91bGnbj1b1aeMifNmY-l58bcvO1xluXIG_dSS1f4Ra7sN02IMfuU3HW032-JQu56PZHVn_7PUwO7l2DComSbXYP9f2o8epGDM0pV5ic8R3xRrUFkORe0';
 
-if (!empty($fcm_bookerToken)) {
-    $message = [
-        'message' => [
-            'token' => $fcm_bookerToken,
-            'notification' => [
-                'title' => 'AGNI RENTAL ADMIN',
-                'body' => 'We have a Enquiry! Check the Admin Panel'
+try {
+    if (!empty($fcm_bookerToken)) {
+        $message = [
+            'message' => [
+                'token' => $fcm_bookerToken,
+                'notification' => [
+                    'title' => 'AGNI RENTAL ADMIN',
+                    'body' => 'We have a Enquiry! Check the Admin Panel'
+                ]
             ]
-        ]
-    ];
+        ];
 
-    $response = sendFcmMessage($projectId, $message);
+        $response = sendFcmMessage($projectId, $message);
+    }
+} catch (Throwable $e) {
+    // Ignore notification errors to ensure client receives the booking response
 }
 // Close DB connection
 $conn->close();

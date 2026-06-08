@@ -285,37 +285,41 @@ if ($bookerTokenResult && mysqli_num_rows($bookerTokenResult) > 0) {
 }
 
 
-foreach ($deviceTokens as $index => $token) {
+try {
+    foreach ($deviceTokens as $index => $token) {
         $deviceToken = htmlspecialchars($token);
        
 
 
-$message = [
-    'message' => [
-        'token' => $deviceToken,
-        'notification' => [
-            'title' => 'RENTOX RIDE',
-            'body' => 'New Trip Added in your app.'
-        ]
-    ]
-];
-
-
-$response = sendFcmMessage($projectId, $message);
-}
-
-if (!empty($fcm_bookerToken)) {
-    $message = [
-        'message' => [
-            'token' => $fcm_bookerToken,
-            'notification' => [
-                'title' => 'AGNI RENTAL ADMIN',
-                'body' => 'We have a new Trip! Check the list'
+        $message = [
+            'message' => [
+                'token' => $deviceToken,
+                'notification' => [
+                    'title' => 'RENTOX RIDE',
+                    'body' => 'New Trip Added in your app.'
+                ]
             ]
-        ]
-    ];
+        ];
 
-    $response = sendFcmMessage($projectId, $message);
+
+        $response = sendFcmMessage($projectId, $message);
+    }
+
+    if (!empty($fcm_bookerToken)) {
+        $message = [
+            'message' => [
+                'token' => $fcm_bookerToken,
+                'notification' => [
+                    'title' => 'AGNI RENTAL ADMIN',
+                    'body' => 'We have a new Trip! Check the list'
+                ]
+            ]
+        ];
+
+        $response = sendFcmMessage($projectId, $message);
+    }
+} catch (Throwable $e) {
+    // Ignore notification errors to ensure client receives the confirmation response
 }
 
 
