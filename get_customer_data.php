@@ -37,8 +37,7 @@ if (empty($phone_number) || !preg_match('/^\d{10}$/', $phone_number)) {
     exit;
 }
 
-// Query the database
-$sql = "SELECT name, email, city, pincode, phone_number ,reward_point, available_spin,badge FROM users WHERE phone_number = ?";
+$sql = "SELECT name, email, city, pincode, phone_number, reward_point, available_spin, badge, agency_name FROM users WHERE phone_number = ?";
 $stmt = $conn->prepare($sql);
 
 
