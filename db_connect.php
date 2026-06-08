@@ -30,4 +30,8 @@ if (!mysqli_query($conn, "SET time_zone = '+05:30'")) {
     ]);
     exit;
 }
+
+// Run database migrations automatically on application startup
+require_once __DIR__ . '/MigrationRunner.php';
+MigrationRunner::run($conn);
 ?>
