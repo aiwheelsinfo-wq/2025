@@ -44,8 +44,8 @@ $bookingRow = $bookingResult->fetch_assoc();
 
 $tempCount = (int)$bookingRow['temp_count'];
 
-// Step 3: Block user if temp bookings exceed 5
-if ($tempCount > 5) {
+// Step 3: Block user if temp bookings exceed 50
+if ($tempCount > 50) {
     $updateStatus = $conn->prepare("UPDATE users SET status = 'Blocked' WHERE phone_number = ?");
     $updateStatus->bind_param("s", $phone_number);
     $updateStatus->execute();
