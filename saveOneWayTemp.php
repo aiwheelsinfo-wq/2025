@@ -2,7 +2,12 @@
 // Allow CORS and set content type
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json");
-header("Access-Control-Allow-Methods: POST");
+header("Access-Control-Allow-Methods: POST, GET");
+
+if (isset($_GET['test'])) {
+    echo json_encode(["status" => "ok", "version" => "v2"]);
+    exit;
+}
 
 require_once 'vendor/autoload.php';
 use Google\Auth\Credentials\ServiceAccountCredentials; // Use the correct class
