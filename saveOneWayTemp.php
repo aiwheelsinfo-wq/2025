@@ -4,6 +4,9 @@ header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json");
 header("Access-Control-Allow-Methods: POST");
 
+require_once 'vendor/autoload.php';
+use Google\Auth\Credentials\ServiceAccountCredentials; // Use the correct class
+
 include 'db_connect.php'; // Make sure this file connects to MySQL and defines $conn
 
 // Read and decode the raw POST body as JSON
@@ -50,8 +53,6 @@ if (
 }
 
 //this below part is for notification to piyush sir
-require 'vendor/autoload.php';
-use Google\Auth\Credentials\ServiceAccountCredentials; // Use the correct class
 // Function to get a service account access token.
 function getAccessToken() {
     // Path to your service account JSON key file. **IMPORTANT: Keep this file secure!**
