@@ -1,4 +1,6 @@
 <?php
+use Google\Auth\Credentials\ServiceAccountCredentials; // Use the correct class
+
 // Allow CORS and set content type
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json");
@@ -10,7 +12,6 @@ if (isset($_GET['test'])) {
 }
 
 require_once 'vendor/autoload.php';
-use Google\Auth\Credentials\ServiceAccountCredentials; // Use the correct class
 
 include 'db_connect.php'; // Make sure this file connects to MySQL and defines $conn
 

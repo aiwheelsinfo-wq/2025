@@ -1,4 +1,5 @@
 <?php
+use Google\Auth\Credentials\ServiceAccountCredentials; // Use the correct class
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -6,8 +7,6 @@ header('Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 
 require_once 'vendor/autoload.php';
-
-use Google\Auth\Credentials\ServiceAccountCredentials; // Use the correct class
 
 
 
