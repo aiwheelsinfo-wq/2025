@@ -97,6 +97,15 @@ foreach ($deviceTokens as $data) {
     // Send the FCM message (send notification if document is expiring in 10 days or less)
     $response = sendFcmMessage($projectId, $message);
 
+    // Update the notification_date inside the loop using vehicle_number column
+    if (!empty($carId)) {
+        $notifyDateSql = "UPDATE cars SET notification_date = CURDATE() WHERE vehicle_number = ?";
+        $stmtt = $conn->prepare($notifyDateSql);
+        $stmtt->bind_param("s", $carId);
+        $stmtt->execute();
+        $stmtt->close();
+    }
+
     // Collect the responses for logging purposes
     $responses[] = [
         "token" => $token,
@@ -116,14 +125,6 @@ WHERE (
               ";
 
 mysqli_query($conn, $updateSql);
-
-
-if (!empty($token)) {
-    $notifyDateSql = "UPDATE cars SET notification_date = CURDATE() WHERE fcm_token = ?";
-    $stmtt = $conn->prepare($notifyDateSql);
-    $stmtt->bind_param("s", $token);
-    $stmtt->execute();
-}
 
 // Step 4: Return the results
 echo json_encode([
