@@ -6,9 +6,16 @@ $phoneNumber = $_POST['phone_number'];
 $otp = $_POST['otp'];
 
 // Query to fetch the OTP and sent time from the database
-$query = "SELECT * FROM users WHERE phone_number = '$phoneNumber' AND otp = '$otp'";
-$result = mysqli_query($conn, $query);
-$row = mysqli_fetch_assoc($result);
+$query = "SELECT * FROM users WHERE phone_number = ? AND otp = ?";
+$stmt = $conn->prepare($query);
+$row = null;
+if ($stmt) {
+    $stmt->bind_param("ss", $phoneNumber, $otp);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $stmt->close();
+}
 
 if ($row) {
     // OTP found in the database, now check if it's expired (5 minutes validity)

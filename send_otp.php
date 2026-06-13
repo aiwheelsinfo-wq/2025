@@ -35,13 +35,22 @@ curl_close($ch);
 
 // Save the phone number and OTP in the database
 $otp_sent_time = date('Y-m-d H:i:s');
-$query = "INSERT INTO users (phone_number, otp, otp_sent_time) VALUES ('$phoneNumber', '$otp', '$otp_sent_time')";
-$result = mysqli_query($conn, $query);
+$query = "INSERT INTO users (phone_number, otp, otp_sent_time) 
+          VALUES (?, ?, ?) 
+          ON DUPLICATE KEY UPDATE otp = ?, otp_sent_time = ?";
+$stmt = $conn->prepare($query);
 
-if ($result) {
-    echo "OTP sent successfully";
+if ($stmt) {
+    $stmt->bind_param("sssss", $phoneNumber, $otp, $otp_sent_time, $otp, $otp_sent_time);
+    $result = $stmt->execute();
+    if ($result) {
+        echo "OTP sent successfully";
+    } else {
+        echo "Error: " . $stmt->error;
+    }
+    $stmt->close();
 } else {
-    echo "Error: " . mysqli_error($conn);
+    echo "Error: " . $conn->error;
 }
 
 mysqli_close($conn);
