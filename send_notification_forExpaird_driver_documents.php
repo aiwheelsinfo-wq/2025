@@ -8,8 +8,7 @@ include 'db_connect.php';
 
 
  
-    $updateSql = "UPDATE drivers SET status = 'Notified' WHERE  DATEDIFF(license_doe, CURDATE()) < 1";
-mysqli_query($conn, $updateSql);
+// (Premature update removed to prevent silencing alerts before notification)
 
 
 // Load Composer's autoloader
@@ -106,7 +105,7 @@ foreach ($deviceTokens as $data) {
 
 
 if (!empty($token)) {
-    $notifyDateSql = "UPDATE drivers SET notification_date = CURDATE() WHERE fcm_token = ?";
+    $notifyDateSql = "UPDATE drivers SET status = 'Notified', notification_date = CURDATE() WHERE fcm_token = ?";
     $stmtt = $conn->prepare($notifyDateSql);
     $stmtt->bind_param("s", $token);
     $stmtt->execute();
