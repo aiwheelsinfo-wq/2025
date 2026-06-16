@@ -14,7 +14,7 @@ include 'db_connect.php';
 
 
 
-$googleMapsApiKey = 'AIzaSyBz4vqQWuT-s_3UEWk6pnSMxSIt7QOZEqk';
+$googleMapsApiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM';
 $from_address = urlencode($_POST['from_address']);  // Customer's pickup address
 $geocodeUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=$from_address&key=$googleMapsApiKey";
 $geoResponse = file_get_contents($geocodeUrl);
