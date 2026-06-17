@@ -26,7 +26,7 @@ if ($bookingId > 0 && ($fromLat === null || $toLat === null)) {
         $row = $result->fetch_assoc();
         $fromAddress = urlencode($row['from_address']);
         $toAddress = urlencode($row['to_address']);
-        $apiKey = 'AIzaSyAjKSgnz_ll5wvTSaIVypYnqhIdSWNGeiQ';
+        $apiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM';
 
         if (!empty($row['from_address'])) {
             $geoUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=$fromAddress&key=$apiKey";

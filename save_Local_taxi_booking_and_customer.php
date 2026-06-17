@@ -52,7 +52,7 @@ try {
 
     // ✅ Geocode function
     function getCoordinates($address) {
-        $apiKey = 'AIzaSyB21TWQklk6a0BPHSiI72gYSqM-T1A86Po'; // Replace with your API key
+        $apiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM'; // Replace with your API key
         $encodedAddress = urlencode($address);
         $url = "https://maps.googleapis.com/maps/api/geocode/json?address=$encodedAddress&key=$apiKey";
         $response = file_get_contents($url);
