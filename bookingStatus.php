@@ -52,7 +52,7 @@ while ($row = $result->fetch_assoc()) {
 
     // ✅ Fetch trip cost details for non-One-way trips
     if ($row['trip_type'] !== 'One-way') {
-        $tripCostQuery = "SELECT baseAmount, extraKMAmount, extraHoursAmount, packageKm, packageHours, gstPercent, driver_allowance
+        $tripCostQuery = "SELECT kmRate, baseAmount, extraKMAmount, extraHoursAmount, packageKm, packageHours, gstPercent, driver_allowance
                           FROM tripCostTable 
                           WHERE tripType = ? AND carType = ?";
         $costStmt = $conn->prepare($tripCostQuery);
