@@ -165,11 +165,15 @@ try {
         $user_stmt->close();
     }
 
+    // Calculate split: 20% platform commission, 80% partner earning
+    $agni_amount = $total_amount * 0.20;
+    $vendor_amount = $total_amount - $agni_amount;
+
     // ✅ Insert booking
     $booking_sql = "INSERT INTO bookings (
         from_address, to_address, distance, car_type, total_amount, trip_type,
-        date, time, mobile, otp, vendor_amount, booker_id, booking_status
-    ) VALUES (?, ?, ?, ?, ?, 'Local-taxi', ?, ?, ?, ?, ?, ?, ?)";
+        date, time, mobile, otp, vendor_amount, agni_amount, booker_id, booking_status
+    ) VALUES (?, ?, ?, ?, ?, 'Local-taxi', ?, ?, ?, ?, ?, ?, ?, ?)";
 
     $booking_stmt = $conn->prepare($booking_sql);
     if (!$booking_stmt) {
@@ -177,7 +181,7 @@ try {
     }
 
     $booking_stmt->bind_param(
-        'ssdsdssssdss',
+        'ssdsdssssddss',
         $from_address,
         $to_address,
         $distance,
@@ -187,7 +191,8 @@ try {
         $current_time,
         $booking_number,
         $otp,
-        $total_amount,
+        $vendor_amount,
+        $agni_amount,
         $phone_number,
         $booking_status
     );
