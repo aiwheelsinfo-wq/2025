@@ -103,6 +103,7 @@ if ($finalCostRow) {
     $data['daily_limit']       = $finalCostRow['daily_limit'];
     $data['driverRate']       = $finalCostRow['driverRate'];
     $data['agni_share']       = $finalCostRow['agni_share'];
+}
 // Step 5: Fetch active discount for this trip type
 $data['discount_type'] = null;
 $data['discount_value'] = 0;
