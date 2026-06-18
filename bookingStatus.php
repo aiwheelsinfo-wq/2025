@@ -82,12 +82,13 @@ while ($row = $result->fetch_assoc()) {
                             $discount_row = $discount_res->fetch_assoc();
                             $disc_type = $discount_row['discount_type'];
                             $disc_val = floatval($discount_row['discount_value']);
+                            $effective_base = ($baseAmount > 0) ? $baseAmount : floatval($row['total_amount']);
                             if ($disc_type === 'percentage') {
                                 $row_discount_percentage = $disc_val;
-                                $row_discounted_price = $baseAmount + ($baseAmount * $row_discount_percentage / 100);
+                                $row_discounted_price = $effective_base + ($effective_base * $row_discount_percentage / 100);
                             } else if ($disc_type === 'fixed') {
-                                $row_discount_percentage = ($baseAmount > 0) ? (($disc_val / $baseAmount) * 100) : 0;
-                                $row_discounted_price = $baseAmount + $disc_val;
+                                $row_discount_percentage = ($effective_base > 0) ? (($disc_val / $effective_base) * 100) : 0;
+                                $row_discounted_price = $effective_base + $disc_val;
                             }
                         }
                         $discount_stmt->close();

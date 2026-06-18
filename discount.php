@@ -4,13 +4,20 @@ require_once 'db_connect.php';
 
 $discount = 0;
 $today = date('Y-m-d');
+$discount_type = 'percentage';
+$discount_value = 0.0;
+$discount_name = 'Loyalty';
+
 $tableCheck = $conn->query("SHOW TABLES LIKE 'discounts'");
 if ($tableCheck && $tableCheck->num_rows > 0) {
-    $discount_query = "SELECT discount_type, discount_value FROM discounts WHERE status = 'active' AND apply_scope = 'One-way' AND '$today' BETWEEN start_date AND end_date ORDER BY id DESC LIMIT 1";
+    $discount_query = "SELECT name, discount_type, discount_value FROM discounts WHERE status = 'active' AND apply_scope = 'One-way' AND '$today' BETWEEN start_date AND end_date ORDER BY id DESC LIMIT 1";
     $discount_res = $conn->query($discount_query);
 
     if ($discount_res && $discount_res->num_rows > 0) {
         $row = $discount_res->fetch_assoc();
+        $discount_type = $row['discount_type'];
+        $discount_value = floatval($row['discount_value']);
+        $discount_name = $row['name'];
         if ($row['discount_type'] === 'percentage') {
             $discount = (int)$row['discount_value'];
         } else {
@@ -31,6 +38,7 @@ if ($tableCheck && $tableCheck->num_rows > 0) {
     if ($result && $result->num_rows > 0) {
         $row = $result->fetch_assoc();
         $discount = (int)$row['discount_percentage'];
+        $discount_value = floatval($discount);
     }
 }
 
@@ -46,11 +54,15 @@ foreach ($carTypes as $index => $car) {
     $response[$car] = $numbers[$index] + $discount;
 }
 
-// Add discount_percentage separately
+// Add discount details separately
 $response['discount_percentage'] = $discount;
+$response['discount_type'] = $discount_type;
+$response['discount_value'] = $discount_value;
+$response['discount_name'] = $discount_name;
 
 // Return JSON response
 echo json_encode($response, JSON_PRETTY_PRINT);
 
 $conn->close();
 ?>
+
