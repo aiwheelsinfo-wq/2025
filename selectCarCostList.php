@@ -5,12 +5,29 @@ include 'db_connect.php';
 
 // Discount percentage
 $discount_percentage = 10;
+$discount_type = 'percentage';
+$discount_value = 10;
 
 // Get parameters
 $tripType  = $_GET['tripType'] ?? '';
 
 if ($tripType === 'One-way') {
     $discount_percentage = 0;
+    $discount_value = 0;
+    $today = date('Y-m-d');
+    $tableCheck = $conn->query("SHOW TABLES LIKE 'discounts'");
+    if ($tableCheck && $tableCheck->num_rows > 0) {
+        $discount_query = "SELECT discount_type, discount_value FROM discounts WHERE status = 'active' AND apply_scope = 'One-way' AND '$today' BETWEEN start_date AND end_date ORDER BY id DESC LIMIT 1";
+        $discount_res = $conn->query($discount_query);
+        if ($discount_res && $discount_res->num_rows > 0) {
+            $row_disc = $discount_res->fetch_assoc();
+            $discount_type = $row_disc['discount_type'];
+            $discount_value = floatval($row_disc['discount_value']);
+            if ($discount_type === 'percentage') {
+                $discount_percentage = $discount_value;
+            }
+        }
+    }
 }
 $bookingId = isset($_GET['bookingId']) ? intval($_GET['bookingId']) : 0;
 
@@ -92,7 +109,13 @@ if ($result && $result->num_rows > 0) {
 
         if ($useRow) {
             $baseAmount = floatval($row['baseAmount']);
-            $discounted_price = $baseAmount + ($baseAmount * $discount_percentage / 100);
+            if ($tripType === 'One-way' && isset($discount_type) && $discount_type === 'fixed') {
+                $row_discount_percentage = ($baseAmount > 0) ? (($discount_value / $baseAmount) * 100) : 0;
+                $discounted_price = $baseAmount + $discount_value;
+            } else {
+                $row_discount_percentage = $discount_percentage;
+                $discounted_price = $baseAmount + ($baseAmount * $row_discount_percentage / 100);
+            }
 
             $cars[$row['carType']] = [
                 'carType' => $row['carType'],
@@ -108,7 +131,7 @@ if ($result && $result->num_rows > 0) {
                 'driverRate' => $row['driverRate'],
                 'agni_share' => $row['agni_share'],
                 'discounted_price' => number_format($discounted_price, 0, '.', ''),
-                'discount_percentage' => $discount_percentage
+                'discount_percentage' => $row_discount_percentage
             ];
         }
     }
@@ -117,7 +140,13 @@ if ($result && $result->num_rows > 0) {
     if (!$found) {
         foreach ($defaultCars as $carType => $row) {
             $baseAmount = floatval($row['baseAmount']);
-            $discounted_price = $baseAmount + ($baseAmount * $discount_percentage / 100);
+            if ($tripType === 'One-way' && isset($discount_type) && $discount_type === 'fixed') {
+                $row_discount_percentage = ($baseAmount > 0) ? (($discount_value / $baseAmount) * 100) : 0;
+                $discounted_price = $baseAmount + $discount_value;
+            } else {
+                $row_discount_percentage = $discount_percentage;
+                $discounted_price = $baseAmount + ($baseAmount * $row_discount_percentage / 100);
+            }
 
             $cars[$row['carType']] = [
                 'carType' => $row['carType'],
@@ -133,7 +162,7 @@ if ($result && $result->num_rows > 0) {
                 'driverRate' => $row['driverRate'],
                 'agni_share' => $row['agni_share'],
                 'discounted_price' => number_format($discounted_price, 0, '.', ''),
-                'discount_percentage' => $discount_percentage
+                'discount_percentage' => $row_discount_percentage
             ];
         }
     }
