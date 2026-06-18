@@ -103,6 +103,47 @@ if ($finalCostRow) {
     $data['daily_limit']       = $finalCostRow['daily_limit'];
     $data['driverRate']       = $finalCostRow['driverRate'];
     $data['agni_share']       = $finalCostRow['agni_share'];
+// Step 5: Fetch active discount for this trip type
+$data['discount_type'] = null;
+$data['discount_value'] = 0;
+$data['discount_name'] = null;
+
+$today = date('Y-m-d');
+$tableCheck = $conn->query("SHOW TABLES LIKE 'discounts'");
+if ($tableCheck && $tableCheck->num_rows > 0) {
+    $discount_stmt = $conn->prepare("SELECT name, discount_type, discount_value FROM discounts WHERE status = 'active' AND apply_scope = ? AND ? BETWEEN start_date AND end_date ORDER BY id DESC LIMIT 1");
+    if ($discount_stmt) {
+        $discount_stmt->bind_param("ss", $tripType, $today);
+        $discount_stmt->execute();
+        $discount_res = $discount_stmt->get_result();
+        if ($discount_res && $discount_res->num_rows > 0) {
+            $discount_row = $discount_res->fetch_assoc();
+            $data['discount_type'] = $discount_row['discount_type'];
+            $data['discount_value'] = floatval($discount_row['discount_value']);
+            $data['discount_name'] = $discount_row['name'];
+        }
+        $discount_stmt->close();
+    }
+}
+
+// Check new customer discount for Local-taxi if no discount found
+if ($tripType === 'Local-taxi' && floatval($data['discount_value']) == 0) {
+    $booker_id = $data['booker_id'];
+    $count_stmt = $conn->prepare("SELECT COUNT(*) AS booking_count FROM bookings WHERE booker_id = ?");
+    if ($count_stmt) {
+        $count_stmt->bind_param("s", $booker_id);
+        $count_stmt->execute();
+        $count_res = $count_stmt->get_result();
+        if ($count_res && $count_row = $count_res->fetch_assoc()) {
+            $booking_count = intval($count_row['booking_count']);
+            if ($booking_count <= 5) {
+                $data['discount_type'] = 'percentage';
+                $data['discount_value'] = 10.0;
+                $data['discount_name'] = 'Loyalty';
+            }
+        }
+        $count_stmt->close();
+    }
 }
 
 echo json_encode($data);
