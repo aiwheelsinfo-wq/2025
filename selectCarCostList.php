@@ -8,6 +8,10 @@ $discount_percentage = 10;
 
 // Get parameters
 $tripType  = $_GET['tripType'] ?? '';
+
+if ($tripType === 'One-way') {
+    $discount_percentage = 0;
+}
 $bookingId = isset($_GET['bookingId']) ? intval($_GET['bookingId']) : 0;
 
 $fromLat = isset($_GET['fromLat']) ? floatval($_GET['fromLat']) : null;

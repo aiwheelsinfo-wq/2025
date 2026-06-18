@@ -73,10 +73,9 @@ while ($row = $result->fetch_assoc()) {
             $costStmt->close();
         }
     } else {
-        // ✅ One-way trip discount
-        $baseAmount = isset($row['base_charge']) ? floatval($row['base_charge']) : 0;
-        $row['discount_percentage'] = $discount_percentage;
-        $row['discounted_price'] = $baseAmount + ($baseAmount * $discount_percentage / 100);
+        // ✅ One-way trip discount (removed)
+        $row['discount_percentage'] = 0;
+        $row['discounted_price'] = 0;
     }
 
     $bookings[] = $row;

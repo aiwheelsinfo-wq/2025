@@ -20,7 +20,7 @@ $booker_id = $_GET['booker_id'];
 
 try {
     // Fetch all bookings for this user ordered by booking date/time
-    $sql = "SELECT id, date, time FROM bookings WHERE booker_id = ? ORDER BY date ASC, time ASC";
+    $sql = "SELECT id, date, time, trip_type FROM bookings WHERE booker_id = ? ORDER BY date ASC, time ASC";
     $stmt = $conn->prepare($sql);
     if ($stmt === false) {
         throw new Exception('Preparation failed: ' . $conn->error);
@@ -38,8 +38,8 @@ try {
     $count = 0;
     while ($row = $result->fetch_assoc()) {
         $count++;
-        // Only first 5 trips get discount
-        $row['discount_percent'] = ($count <= 5) ? 10 : 0;
+        // Only first 5 trips get discount, except One-way trips which never get a discount
+        $row['discount_percent'] = ($count <= 5 && $row['trip_type'] !== 'One-way') ? 10 : 0;
         $bookings[] = $row;
     }
 
