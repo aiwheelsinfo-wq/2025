@@ -98,6 +98,8 @@ $business_pincode = $_POST['business_pincode'];
 date_default_timezone_set('Asia/Kolkata');
 $booked_at = date('Y-m-d H:i:s');
 $bookingId = $_POST['bookingId'];
+$discount_amount = floatval($_POST['discount_amount'] ?? 0);
+$discount_name = $conn->real_escape_string($_POST['discount_name'] ?? '');
 
 
 
@@ -183,6 +185,8 @@ if($trip_type == 'One-way' && !empty($bookingId)){
     business_name = '$business_name',
     business_address = '$business_address',
     business_pincode = '$business_pincode',
+    discount_amount = '$discount_amount',
+    discount_name = '$discount_name',
     booking_status = 'Pending'
 WHERE id = '$bookingId'"; // Assumes 'id' is the primary key column name
 
@@ -202,8 +206,8 @@ echo json_encode($response);
 else{
 
 // 🔽 Now insert booking info into `bookings` table (only relevant fields)
-$insertBookingSql = "INSERT INTO bookings (trip_type, car_type, from_address, to_address, distance, date, time,booked_at, mobile, agent_commission, base_charge, driver_ta, toll_charge, total_amount, payment_type, return_date, return_time, otp, agni_amount, vendor_amount, booker_id, gst, gst_number, business_name, business_address, business_pincode, booking_status)
-VALUES ('$trip_type', '$car_type', '$from_address', '$to_address', '$distance', '$date', '$tripTime', '$booked_at', '$contact_number', '$agent_commission', '$base_charge', '$driver_ta', '$toll_charge', '$total_amount', '$payment_type', '$return_date', '$return_time', '$otp', '$agni_amount', '$vendor_amount', '$userNumber', '$gst', '$gst_number', '$business_name', '$business_address', '$business_pincode', 'Pending')";
+$insertBookingSql = "INSERT INTO bookings (trip_type, car_type, from_address, to_address, distance, date, time,booked_at, mobile, agent_commission, base_charge, driver_ta, toll_charge, total_amount, payment_type, return_date, return_time, otp, agni_amount, vendor_amount, booker_id, gst, gst_number, business_name, business_address, business_pincode, discount_amount, discount_name, booking_status)
+VALUES ('$trip_type', '$car_type', '$from_address', '$to_address', '$distance', '$date', '$tripTime', '$booked_at', '$contact_number', '$agent_commission', '$base_charge', '$driver_ta', '$toll_charge', '$total_amount', '$payment_type', '$return_date', '$return_time', '$otp', '$agni_amount', '$vendor_amount', '$userNumber', '$gst', '$gst_number', '$business_name', '$business_address', '$business_pincode', '$discount_amount', '$discount_name', 'Pending')";
 
 
 if (mysqli_query($conn, $insertBookingSql)) {
