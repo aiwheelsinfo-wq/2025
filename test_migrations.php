@@ -36,7 +36,7 @@ if ($migrationsResult) {
 }
 
 echo "\n3. Checking if target tables exist:\n";
-$tables = ['customer', 'orders'];
+$tables = ['customer', 'orders', 'discounts'];
 foreach ($tables as $table) {
     $tableCheck = mysqli_query($conn, "SHOW TABLES LIKE '$table'");
     if (mysqli_num_rows($tableCheck) > 0) {
@@ -62,6 +62,23 @@ if (mysqli_num_rows($indexCheck) > 0) {
     echo " - Index 'idx_customer_id': EXISTS (Column: {$indexDetails['Column_name']})\n";
 } else {
     echo " - Index 'idx_customer_id': MISSING\n";
+}
+
+echo "\n5.1 Checking 'discounts' table content:\n";
+$discountsCheck = mysqli_query($conn, "SELECT COUNT(*) as cnt FROM `discounts`");
+if ($discountsCheck) {
+    $row = mysqli_fetch_assoc($discountsCheck);
+    echo " - Row count in 'discounts': {$row['cnt']}\n";
+    
+    $defaultDiscountCheck = mysqli_query($conn, "SELECT * FROM `discounts` WHERE name = 'Loyalty Discount' LIMIT 1");
+    if ($defaultDiscountCheck && mysqli_num_rows($defaultDiscountCheck) > 0) {
+        $dd = mysqli_fetch_assoc($defaultDiscountCheck);
+        echo " - Default Loyalty Discount: EXISTS (Value: {$dd['discount_value']}, Type: {$dd['discount_type']}, Scope: {$dd['apply_scope']}, Status: {$dd['status']})\n";
+    } else {
+        echo " - Default Loyalty Discount: MISSING\n";
+    }
+} else {
+    echo " - Could not check 'discounts' table: " . mysqli_error($conn) . "\n";
 }
 
 echo "\n6. Displaying last 20 lines of migrations.log:\n";
