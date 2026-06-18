@@ -67,13 +67,14 @@ while ($row = $result->fetch_assoc()) {
             
             // Check active discount for this trip type/scope
             if ($row['trip_type'] === 'One-way') {
-                $row_discount_percentage = 0;
+                 $row_discount_percentage = 0;
                 $row_discounted_price = 0;
+                $row_discount_name = 'Loyalty';
                 $today = date('Y-m-d');
                 
                 $tableCheck = $conn->query("SHOW TABLES LIKE 'discounts'");
                 if ($tableCheck && $tableCheck->num_rows > 0) {
-                    $discount_stmt = $conn->prepare("SELECT discount_type, discount_value FROM discounts WHERE status = 'active' AND apply_scope = 'One-way' AND ? BETWEEN start_date AND end_date ORDER BY id DESC LIMIT 1");
+                    $discount_stmt = $conn->prepare("SELECT name, discount_type, discount_value FROM discounts WHERE status = 'active' AND apply_scope = 'One-way' AND ? BETWEEN start_date AND end_date ORDER BY id DESC LIMIT 1");
                     if ($discount_stmt) {
                         $discount_stmt->bind_param("s", $today);
                         $discount_stmt->execute();
@@ -82,6 +83,7 @@ while ($row = $result->fetch_assoc()) {
                             $discount_row = $discount_res->fetch_assoc();
                             $disc_type = $discount_row['discount_type'];
                             $disc_val = floatval($discount_row['discount_value']);
+                            $row_discount_name = $discount_row['name'];
                             $effective_base = ($baseAmount > 0) ? $baseAmount : floatval($row['total_amount']);
                             if ($disc_type === 'percentage') {
                                 $row_discount_percentage = $disc_val;
@@ -96,10 +98,12 @@ while ($row = $result->fetch_assoc()) {
                 }
                 $row['discount_percentage'] = $row_discount_percentage;
                 $row['discounted_price'] = $row_discounted_price;
+                $row['discount_name'] = $row_discount_name;
             } else {
                 // non-One-way trip
                 $row['discount_percentage'] = $discount_percentage;
                 $row['discounted_price'] = $baseAmount + ($baseAmount * $discount_percentage / 100);
+                $row['discount_name'] = 'Loyalty';
             }
         } else {
             $row['discount_percentage'] = 0;
