@@ -105,48 +105,5 @@ if ($finalCostRow) {
     $data['agni_share']       = $finalCostRow['agni_share'];
 }
 
-// Step 5: Get discount information
-if ($data['trip_type'] === 'One-way') {
-    $row_discount_percentage = 0;
-    $row_discounted_price = 0;
-    $row_discount_name = 'Loyalty';
-    $today = date('Y-m-d');
-    
-    $tableCheck = $conn->query("SHOW TABLES LIKE 'discounts'");
-    if ($tableCheck && $tableCheck->num_rows > 0) {
-        $discount_stmt = $conn->prepare("SELECT name, discount_type, discount_value FROM discounts WHERE status = 'active' AND apply_scope = 'One-way' AND ? BETWEEN start_date AND end_date ORDER BY id DESC LIMIT 1");
-        if ($discount_stmt) {
-            $discount_stmt->bind_param("s", $today);
-            $discount_stmt->execute();
-            $discount_res = $discount_stmt->get_result();
-            if ($discount_res && $discount_res->num_rows > 0) {
-                $discount_row = $discount_res->fetch_assoc();
-                $disc_type = $discount_row['discount_type'];
-                $disc_val = floatval($discount_row['discount_value']);
-                $row_discount_name = $discount_row['name'];
-                
-                $baseAmountVal = isset($data['baseAmount']) ? floatval($data['baseAmount']) : 0;
-                $effective_base = ($baseAmountVal > 0) ? $baseAmountVal : floatval($data['total_amount']);
-                
-                if ($disc_type === 'percentage') {
-                    $row_discount_percentage = $disc_val;
-                    $row_discounted_price = $effective_base + ($effective_base * $row_discount_percentage / 100);
-                } else if ($disc_type === 'fixed') {
-                    $row_discount_percentage = ($effective_base > 0) ? (($disc_val / $effective_base) * 100) : 0;
-                    $row_discounted_price = $effective_base + $disc_val;
-                }
-            }
-            $discount_stmt->close();
-        }
-    }
-    $data['discount_percentage'] = $row_discount_percentage;
-    $data['discounted_price'] = $row_discounted_price;
-    $data['discount_name'] = $row_discount_name;
-} else {
-    $data['discount_percentage'] = 0;
-    $data['discounted_price'] = 0;
-    $data['discount_name'] = '';
-}
-
 echo json_encode($data);
 ?>
