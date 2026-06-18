@@ -139,15 +139,24 @@ class MigrationRunner {
      * Checks if migrations table exists, and creates it if it doesn't.
      */
     private static function ensureMigrationsTable(mysqli $conn) {
-        // Fast-path: check if migrations table exists by running a simple query
-        $check = mysqli_query($conn, "SELECT 1 FROM migrations LIMIT 1");
-        if ($check !== false) {
-            mysqli_free_result($check);
-            return;
+        $tableExists = false;
+        try {
+            $check = mysqli_query($conn, "SELECT 1 FROM migrations LIMIT 1");
+            if ($check !== false) {
+                mysqli_free_result($check);
+                $tableExists = true;
+            }
+        } catch (Throwable $e) {
+            $code = $e->getCode();
+            $errno = mysqli_errno($conn);
+            if ($code == 1146 || $errno == 1146 || strpos($e->getMessage(), "doesn't exist") !== false) {
+                $tableExists = false;
+            } else {
+                throw $e;
+            }
         }
 
-        // If table doesn't exist, we expect MySQL error 1146 (Table doesn't exist)
-        if (mysqli_errno($conn) == 1146) {
+        if (!$tableExists) {
             self::log("INFO: Migrations table does not exist. Creating it.");
             $sql = "CREATE TABLE IF NOT EXISTS migrations (
                 id INT AUTO_INCREMENT PRIMARY KEY,
