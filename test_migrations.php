@@ -91,20 +91,4 @@ if (file_exists($logPath)) {
     echo "migrations.log file does not exist.\n";
 }
 
-echo "\n7. Checking migration 006 - discount_amount column in bookings:\n";
-$colCheck = mysqli_query($conn, "SHOW COLUMNS FROM `bookings` LIKE 'discount_amount'");
-if ($colCheck && mysqli_num_rows($colCheck) > 0) {
-    $colInfo = mysqli_fetch_assoc($colCheck);
-    echo " - Column 'discount_amount': EXISTS (Type: {$colInfo['Type']}, Default: {$colInfo['Default']})\n";
-} else {
-    echo " - Column 'discount_amount': MISSING - migration 006 has not run yet!\n";
-}
-
-$colCheck2 = mysqli_query($conn, "SHOW COLUMNS FROM `bookings` LIKE 'discount_name'");
-if ($colCheck2 && mysqli_num_rows($colCheck2) > 0) {
-    echo " - Column 'discount_name': EXISTS\n";
-} else {
-    echo " - Column 'discount_name': MISSING\n";
-}
-
 echo "\n=== VERIFICATION COMPLETE ===\n";
