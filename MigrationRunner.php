@@ -140,20 +140,10 @@ class MigrationRunner {
      */
     private static function ensureMigrationsTable(mysqli $conn) {
         $tableExists = false;
-        try {
-            $check = mysqli_query($conn, "SELECT 1 FROM migrations LIMIT 1");
-            if ($check !== false) {
-                mysqli_free_result($check);
-                $tableExists = true;
-            }
-        } catch (Throwable $e) {
-            $code = $e->getCode();
-            $errno = mysqli_errno($conn);
-            if ($code == 1146 || $errno == 1146 || strpos($e->getMessage(), "doesn't exist") !== false) {
-                $tableExists = false;
-            } else {
-                throw $e;
-            }
+        $result = mysqli_query($conn, "SHOW TABLES LIKE 'migrations'");
+        if ($result && mysqli_num_rows($result) > 0) {
+            $tableExists = true;
+            mysqli_free_result($result);
         }
 
         if (!$tableExists) {
