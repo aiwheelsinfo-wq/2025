@@ -40,7 +40,7 @@ $trip_type = $booking_info['trip_type'] ?? '';
 if ($status === 'success') {
     if ($trip_type === 'Round-Trip') {
         $payment_status_db = 'Advance Paid';
-        $booking_status_db = 'Confirmed';
+        $booking_status_db = 'Pending';
     } else {
         $payment_status_db = 'success';
         $booking_status_db = 'Pending';
