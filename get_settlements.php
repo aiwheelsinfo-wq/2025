@@ -35,7 +35,7 @@ $result = $stmt->get_result();
 $settlements = [];
 while ($row = $result->fetch_assoc()) {
     $advance = floatval($row['paid_amount']);
-    $eligible = $advance * 0.90;
+    $eligible = $advance * 0.66;
     
     // Calculate expected settlement date: 7 days after completion
     // completion date defaults to closing_date if set, else travel date
