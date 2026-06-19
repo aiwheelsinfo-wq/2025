@@ -46,8 +46,8 @@ if ($status === 'success') {
         $booking_status_db = 'Pending';
     }
 } else {
-    $payment_status_db = $status;
-    $booking_status_db = 'Pending';
+    $payment_status_db = 'Failed';
+    $booking_status_db = 'Failed';
 }
 
 $sql = "UPDATE bookings 
