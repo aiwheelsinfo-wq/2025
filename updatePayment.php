@@ -54,6 +54,7 @@ $sql = "UPDATE bookings
         SET payment_id = '$payment_id', 
             payment_status = '$payment_status_db', 
             paid_amount = '$amount', 
+            remaining_balance = total_amount - '$amount',
             booking_status = '$booking_status_db'
         WHERE id = '$booking_id'";
 
