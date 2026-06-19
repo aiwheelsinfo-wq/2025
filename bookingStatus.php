@@ -51,7 +51,7 @@ while ($row = $result->fetch_assoc()) {
     }
 
     // ✅ Fetch trip cost details
-    $tripCostQuery = "SELECT kmRate, baseAmount, extraKMAmount, extraHoursAmount, packageKm, packageHours, gstPercent, driver_allowance
+    $tripCostQuery = "SELECT kmRate, baseAmount, extraKMAmount, extraHoursAmount, packageKm, packageHours, gstPercent, driver_allowance, daily_limit
                       FROM tripCostTable 
                       WHERE tripType = ? AND carType = ?";
     $costStmt = $conn->prepare($tripCostQuery);
