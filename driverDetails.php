@@ -11,7 +11,7 @@ if (isset($_GET['driver_id'])) {
     $driver_id = $_GET['driver_id'];
 
     // Prepare query (assuming 'driver_id' is the correct column)
-    $stmt = $conn->prepare("SELECT phone_number, full_name FROM drivers WHERE phone_number = ?");
+    $stmt = $conn->prepare("SELECT phone_number, full_name, vehicle_id, vehicle_name, vehicle_type FROM drivers WHERE phone_number = ?");
     
     if ($stmt === false) {
         echo json_encode(["status" => "error", "message" => "Query preparation failed"]);
