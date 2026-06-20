@@ -18,7 +18,7 @@ if (isset($_GET['driver_id'])) {
         exit;
     }
 
-    $stmt->bind_param("i", $driver_id); // 'i' for integer, change to 's' if driver_id is a string
+    $stmt->bind_param("s", $driver_id); // 's' since driver_id is a phone number string
     $stmt->execute();
     $result = $stmt->get_result();
 
