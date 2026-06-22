@@ -1,20 +1,38 @@
 <?php
 include "db_connect.php";
-$query = "SELECT id, date, time, total_amount, paid_amount, booking_status FROM bookings ORDER BY id DESC LIMIT 5";
-$result = $conn->query($query);
-$bookings = [];
-while ($row = $result->fetch_assoc()) {
-    $pickup_str = $row['date'] . ' ' . $row['time'];
-    $pickup_ts = strtotime($pickup_str);
-    $current_ts = time();
-    $diff_seconds = $pickup_ts - $current_ts;
-    $diff_hours = $diff_seconds / 3600.0;
-    $row['pickup_str'] = $pickup_str;
-    $row['pickup_ts'] = $pickup_ts;
-    $row['current_ts'] = $current_ts;
-    $row['current_date_time'] = date('Y-m-d H:i:s', $current_ts);
-    $row['diff_hours'] = $diff_hours;
-    $bookings[] = $row;
+
+$policyResult = $conn->query("SELECT * FROM cancellation_policy ORDER BY id DESC LIMIT 1");
+$policy = $policyResult ? $policyResult->fetch_assoc() : null;
+
+if (!$policy) {
+    echo json_encode(["status" => "error", "message" => "Policy not configured"]);
+    exit;
 }
-echo json_encode($bookings, JSON_PRETTY_PRINT);
+
+$test_hours = [72, 50, 48, 47.9, 30, 24, 23.9, 18, 12, 11.9, 8, 6, 5.9, 3, 1];
+$results = [];
+
+foreach ($test_hours as $diff_hours) {
+    $refund_percentage = 0.00;
+    if ($diff_hours >= 48) {
+        $refund_percentage = (float)$policy['refund_above_48h'];
+    } elseif ($diff_hours >= 24) {
+        $refund_percentage = (float)$policy['refund_24_48h'];
+    } elseif ($diff_hours >= 12) {
+        $refund_percentage = (float)$policy['refund_12_24h'];
+    } elseif ($diff_hours >= 6) {
+        $refund_percentage = (float)$policy['refund_6_12h'];
+    } else {
+        $refund_percentage = (float)$policy['refund_below_6h'];
+    }
+    $results["hours_{$diff_hours}"] = [
+        "hours" => $diff_hours,
+        "refund_percent" => $refund_percentage
+    ];
+}
+
+echo json_encode([
+    "policy" => $policy,
+    "results" => $results
+], JSON_PRETTY_PRINT);
 ?>
