@@ -28,7 +28,14 @@ if (
     $from = $conn->real_escape_string($data['from']);
     $to = $conn->real_escape_string($data['to']);
     $date = $conn->real_escape_string($data['date']);
-    $time = $conn->real_escape_string($data['time']);
+    
+    $time = $data['time'];
+    $time_parsed = strtotime($time);
+    if ($time_parsed !== false) {
+        $time = date('H:i:s', $time_parsed);
+    }
+    $time = $conn->real_escape_string($time);
+    
     $trip_type = 'One-way'; // Static value
     $booker_id = $conn->real_escape_string($data['savedNumber']);
 

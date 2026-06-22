@@ -147,5 +147,12 @@ if ($tripType === 'Local-taxi' && floatval($data['discount_value']) == 0) {
     }
 }
 
+if (!empty($data['time'])) {
+    $data['time'] = date('h:i A', strtotime($data['time']));
+}
+if (!empty($data['return_time']) && $data['return_time'] !== '00:00:00') {
+    $data['return_time'] = date('h:i A', strtotime($data['return_time']));
+}
+
 echo json_encode($data);
 ?>

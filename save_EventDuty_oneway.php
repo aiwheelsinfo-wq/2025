@@ -26,8 +26,16 @@ $to_address      = $_POST['to_address'] ?? '';
 $distance        = $_POST['distance'] ?? 0;
 $date            = $_POST['date'] ?? date('Y-m-d');
 $tripTime        = $_POST['tripTime'] ?? date('H:i:s');
+$tripTimeParsed = strtotime($tripTime);
+if ($tripTimeParsed !== false) {
+    $tripTime = date('H:i:s', $tripTimeParsed);
+}
 $return_date     = $_POST['return_date'] ?? '1970-01-01';
 $return_time     = $_POST['return_time'] ?? '00:00:00';
+$returnTimeParsed = strtotime($return_time);
+if ($returnTimeParsed !== false) {
+    $return_time = date('H:i:s', $returnTimeParsed);
+}
 $name            = $_POST['name'] ?? '';
 $email           = $_POST['email'] ?? '';
 $pincode         = $_POST['pincode'] ?? '';

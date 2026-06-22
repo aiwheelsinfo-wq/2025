@@ -40,6 +40,9 @@ try {
         $count++;
         // Only first 5 trips get discount, except One-way trips which never get a discount
         $row['discount_percent'] = ($count <= 5 && $row['trip_type'] !== 'One-way') ? 10 : 0;
+        if (!empty($row['time'])) {
+            $row['time'] = date('h:i A', strtotime($row['time']));
+        }
         $bookings[] = $row;
     }
 

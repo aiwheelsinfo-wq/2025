@@ -72,8 +72,16 @@ $to_address = $_POST['to_address'];
 $distance = $_POST['distance'];
 $date = date('Y-m-d', strtotime($_POST['date']));
 $tripTime = $_POST['tripTime']; 
+$tripTimeParsed = strtotime($tripTime);
+if ($tripTimeParsed !== false) {
+    $tripTime = date('H:i:s', $tripTimeParsed);
+}
 $return_date = date('Y-m-d', strtotime($_POST['return_date']));
 $return_time = $_POST['return_time']; 
+$returnTimeParsed = strtotime($return_time);
+if ($returnTimeParsed !== false) {
+    $return_time = date('H:i:s', $returnTimeParsed);
+}
 $name = $_POST['name'];
 $email = $_POST['email'];
 $pincode = $_POST['pincode'];

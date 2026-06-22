@@ -112,6 +112,13 @@ while ($row = $result->fetch_assoc()) {
         $costStmt->close();
     }
 
+    if (!empty($row['time'])) {
+        $row['time'] = date('h:i A', strtotime($row['time']));
+    }
+    if (!empty($row['return_time']) && $row['return_time'] !== '00:00:00') {
+        $row['return_time'] = date('h:i A', strtotime($row['return_time']));
+    }
+
     $bookings[] = $row;
 }
 
