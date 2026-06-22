@@ -19,12 +19,16 @@ $stmt = $conn->prepare("
         settlement_date,
         transaction_reference,
         date,
-        closing_date
+        closing_date,
+        cancelled_at,
+        vendor_compensation,
+        vendor_compensation_status
     FROM bookings
     WHERE vender_id = ?
-      AND trip_type = 'One-way'
-      AND payment_type = 'Advance'
-      AND (payment_status = 'success' OR payment_status = 'Advance Paid')
+      AND (
+          (trip_type = 'One-way' AND payment_type = 'Advance' AND (payment_status = 'success' OR payment_status = 'Advance Paid') AND booking_status != 'Cancelled')
+          OR (booking_status = 'Cancelled' AND vendor_compensation > 0)
+      )
     ORDER BY id DESC
 ");
 
@@ -35,12 +39,21 @@ $result = $stmt->get_result();
 $settlements = [];
 while ($row = $result->fetch_assoc()) {
     $advance = floatval($row['paid_amount']);
-    $eligible = $advance * 0.60;
     
-    // Calculate expected settlement date: 7 days after completion
-    // completion date defaults to closing_date if set, else travel date
-    $completion_base = (!empty($row['closing_date']) && $row['closing_date'] !== '0000-00-00') ? $row['closing_date'] : $row['date'];
-    $expected_ts = strtotime($completion_base) + (7 * 24 * 60 * 60);
+    if ($row['booking_status'] === 'Cancelled') {
+        $eligible = floatval($row['vendor_compensation']);
+        $settlement_status = $row['vendor_compensation_status'] ?: 'Pending';
+        // expected date is 7 days after cancellation
+        $cancellation_base = (!empty($row['cancelled_at']) && $row['cancelled_at'] !== '0000-00-00 00:00:00') ? $row['cancelled_at'] : $row['date'];
+        $expected_ts = strtotime($cancellation_base) + (7 * 24 * 60 * 60);
+    } else {
+        $eligible = $advance * 0.60;
+        $settlement_status = $row['settlement_status'] ?: 'Pending';
+        // completion date defaults to closing_date if set, else travel date
+        $completion_base = (!empty($row['closing_date']) && $row['closing_date'] !== '0000-00-00') ? $row['closing_date'] : $row['date'];
+        $expected_ts = strtotime($completion_base) + (7 * 24 * 60 * 60);
+    }
+    
     $expected_settlement_date = date('Y-m-d', $expected_ts);
 
     $settlements[] = [
@@ -48,7 +61,7 @@ while ($row = $result->fetch_assoc()) {
         "advance_paid" => $advance,
         "eligible_amount" => $eligible,
         "trip_status" => $row['booking_status'],
-        "settlement_status" => $row['settlement_status'] ?: 'Pending',
+        "settlement_status" => $settlement_status,
         "settlement_date" => $row['settlement_date'],
         "transaction_reference" => $row['transaction_reference'],
         "expected_settlement_date" => $expected_settlement_date
