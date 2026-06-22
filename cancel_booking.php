@@ -136,7 +136,7 @@ $updateStmt = $conn->prepare("UPDATE bookings SET
     vendor_compensation_status = ? 
     WHERE id = ?");
 
-$updateStmt->bind_param("ssddsdssi", 
+$updateStmt->bind_param("ssddsdsi", 
     $new_booking_status, 
     $reason, 
     $cancellation_charge, 
