@@ -1,4 +1,6 @@
 <?php
+use Google\Auth\Credentials\ServiceAccountCredentials;
+
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, OPTIONS");
@@ -8,7 +10,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);
 }
 
+require_once 'vendor/autoload.php';
 include "db_connect.php";
+
+// ── FCM helpers ───────────────────────────────────────────────────────────────
+function getAccessToken() {
+    $keyFile = '/home/o96ayd7ennr5/public_html/2025/agni-car-app-firebase-adminsdk-fbsvc-4f70f7d1f2.json';
+    $scopes  = ['https://www.googleapis.com/auth/firebase.messaging'];
+    $creds   = new ServiceAccountCredentials($scopes, $keyFile);
+    $token   = $creds->fetchAuthToken();
+    return $token['access_token'];
+}
+
+function sendFcmMessage($projectId, $message) {
+    $accessToken = getAccessToken();
+    $url = 'https://fcm.googleapis.com/v1/projects/' . $projectId . '/messages:send';
+    $headers = [
+        'Authorization: Bearer ' . $accessToken,
+        'Content-Type: application/json',
+    ];
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($message));
+    $result = curl_exec($ch);
+    curl_close($ch);
+    return $result;
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Accept both url-encoded POST and raw JSON POST
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -33,7 +64,7 @@ if (!$booking) {
     exit;
 }
 
-$non_cancellable = ['Completed', 'Cancelled', 'Declined', 'Failed', 'Deleted', 'Cancellation Requested'];
+$non_cancellable = ['Completed', 'Cancelled', 'Customer Cancelled', 'Declined', 'Failed', 'Deleted', 'Cancellation Requested'];
 if (in_array($booking['booking_status'], $non_cancellable)) {
     echo json_encode([
         "status" => "error", 
@@ -113,7 +144,9 @@ if ((int)$policy['manual_approval'] === 1) {
     $new_booking_status = 'Cancellation Requested';
     $new_refund_status = 'Pending Approval';
 } else {
-    $new_booking_status = 'Cancelled';
+    // Use 'Customer Cancelled' so the driver app can distinguish this from
+    // driver-side cancellations and move it to Cancellation History.
+    $new_booking_status = 'Customer Cancelled';
     if ((int)$policy['auto_refund'] === 1) {
         $new_refund_status = 'Completed';
     } else {
@@ -156,6 +189,70 @@ if ($updateStmt->execute()) {
             "vendor_compensation" => round($vendor_compensation, 2)
         ]
     ]);
+
+    // ── Notify the assigned driver/vendor via FCM ─────────────────────────────
+    try {
+        $driver_fcm_token = null;
+
+        // First try to get the vendor's FCM token
+        if (!empty($booking['vender_id'])) {
+            $vendorStmt = $conn->prepare(
+                "SELECT fcm_token FROM drivers WHERE phone_number = ? AND fcm_token IS NOT NULL AND fcm_token != '' LIMIT 1"
+            );
+            $vendorStmt->bind_param("s", $booking['vender_id']);
+            $vendorStmt->execute();
+            $vendorResult = $vendorStmt->get_result();
+            if ($vendorRow = $vendorResult->fetch_assoc()) {
+                $driver_fcm_token = $vendorRow['fcm_token'];
+            }
+            $vendorStmt->close();
+        }
+
+        // Fallback: try driver_id directly
+        if (empty($driver_fcm_token) && !empty($booking['driver_id'])) {
+            $driverStmt = $conn->prepare(
+                "SELECT fcm_token FROM drivers WHERE id = ? AND fcm_token IS NOT NULL AND fcm_token != '' LIMIT 1"
+            );
+            $driverStmt->bind_param("i", $booking['driver_id']);
+            $driverStmt->execute();
+            $driverResult = $driverStmt->get_result();
+            if ($driverRow = $driverResult->fetch_assoc()) {
+                $driver_fcm_token = $driverRow['fcm_token'];
+            }
+            $driverStmt->close();
+        }
+
+        if (!empty($driver_fcm_token)) {
+            $refundText = ($refund_percentage > 0)
+                ? number_format($refund_amount, 2) . ' INR (' . number_format($refund_percentage, 0) . '% refund)'
+                : 'No refund applicable';
+
+            $notifMessage = [
+                'message' => [
+                    'token' => $driver_fcm_token,
+                    'notification' => [
+                        'title' => '⚠️ Trip Cancelled by Customer',
+                        'body'  => 'Booking #' . $booking_id . ' has been cancelled. '
+                                 . 'Refund: ' . $refundText . '. '
+                                 . 'Check Cancellation History for details.'
+                    ],
+                    'data' => [
+                        'type'               => 'customer_cancelled',
+                        'booking_id'         => (string)$booking_id,
+                        'booking_status'     => $new_booking_status,
+                        'refund_amount'      => (string)round($refund_amount, 2),
+                        'refund_percentage'  => (string)$refund_percentage,
+                        'cancellation_charge'=> (string)round($cancellation_charge, 2),
+                    ]
+                ]
+            ];
+
+            sendFcmMessage('agni-car-app', $notifMessage);
+        }
+    } catch (Throwable $fcmEx) {
+        // Never let notification errors break the main response
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 } else {
     echo json_encode(["status" => "error", "message" => "Database update failed: " . $conn->error]);
 }
