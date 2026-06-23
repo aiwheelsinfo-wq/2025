@@ -84,12 +84,12 @@ try {
     }
 
     // Fetch ALL vendor tokens from database
-    $sql = "SELECT id, name, phone, fcm_token, userType, status 
+    $sql = "SELECT driver_id, name, phone, fcm_token, userType, status 
             FROM drivers 
             WHERE userType = 'vendor' 
             AND fcm_token IS NOT NULL 
             AND fcm_token != '' 
-            ORDER BY id DESC";
+            ORDER BY driver_id DESC";
     
     $result = mysqli_query($conn, $sql);
     if (!$result) {
@@ -130,9 +130,9 @@ try {
                 $unregistered_tokens++;
                 // Clean up this token if cleanup mode is on
                 if ($cleanup) {
-                    $clean_sql = "UPDATE drivers SET fcm_token = NULL WHERE id = " . intval($vendor['id']);
+                    $clean_sql = "UPDATE drivers SET fcm_token = NULL WHERE driver_id = " . intval($vendor['driver_id']);
                     mysqli_query($conn, $clean_sql);
-                    $cleaned_up[] = $vendor['id'];
+                    $cleaned_up[] = $vendor['driver_id'];
                 }
             } else {
                 $status = 'NOT_FOUND';
@@ -145,9 +145,9 @@ try {
                 $sender_mismatch_tokens++;
                 // Also clean these - they're from wrong Firebase project
                 if ($cleanup) {
-                    $clean_sql = "UPDATE drivers SET fcm_token = NULL WHERE id = " . intval($vendor['id']);
+                    $clean_sql = "UPDATE drivers SET fcm_token = NULL WHERE driver_id = " . intval($vendor['driver_id']);
                     mysqli_query($conn, $clean_sql);
-                    $cleaned_up[] = $vendor['id'];
+                    $cleaned_up[] = $vendor['driver_id'];
                 }
             } else {
                 $status = 'PERMISSION_DENIED';
@@ -159,7 +159,7 @@ try {
         }
 
         $report[] = [
-            'vendor_id' => $vendor['id'],
+            'vendor_id' => $vendor['driver_id'],
             'name' => $vendor['name'],
             'phone' => $vendor['phone'],
             'db_status' => $vendor['status'],
