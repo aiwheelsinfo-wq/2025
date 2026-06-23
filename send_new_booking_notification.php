@@ -62,7 +62,7 @@ function trigger_new_booking_notification($booking_id) {
     }
     
     // 1. Fetch booking details
-    $stmt = $conn->prepare("SELECT id, trip_type, from_address, to_address FROM bookings WHERE id = ?");
+    $stmt = $conn->prepare("SELECT id, trip_type, from_address, to_address, vendor_amount FROM bookings WHERE id = ?");
     if (!$stmt) {
         error_log("Notification DB Error: " . $conn->error);
         return;
@@ -83,6 +83,7 @@ function trigger_new_booking_notification($booking_id) {
     $trip_type = $booking['trip_type'] ?? '';
     $pickup_location = $booking['from_address'] ?? '';
     $drop_location = $booking['to_address'] ?? '';
+    $vendor_amount = $booking['vendor_amount'] ?? '0.00';
     
     // 2. Fetch active vendors/drivers with FCM tokens
     // Includes userType='vendor' AND empty userType (some vendors register without userType set)
@@ -106,14 +107,22 @@ function trigger_new_booking_notification($booking_id) {
     // 3. Prepare FCM message
     $keyFileContent = json_decode(file_get_contents(__DIR__ . '/agni-car-app-firebase-adminsdk-fbsvc-4f70f7d1f2.json'), true);
     $projectId = $keyFileContent['project_id'] ?? 'agnicarrentaldriver-8fb07';
+    
+    $bodyText = "From: " . $pickup_location;
+    if (!empty($drop_location)) {
+        $bodyText .= "\nTo: " . $drop_location;
+    }
+    $bodyText .= "\nEarnings: ₹" . number_format((float)$vendor_amount, 2);
+
     $notificationData = [
-        'title' => 'New Trip Available',
-        'body' => 'You have received a new trip request. Open the app to view details.',
+        'title' => 'New Trip Available - ' . $trip_type,
+        'body' => $bodyText,
         'data' => [
             'booking_id' => $booking_id_str,
             'booking_type' => $trip_type,
             'pickup_location' => $pickup_location,
             'drop_location' => $drop_location,
+            'vendor_amount' => (string)$vendor_amount,
             'notification_type' => 'new_booking'
         ]
     ];
