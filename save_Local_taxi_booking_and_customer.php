@@ -67,14 +67,19 @@ try {
         return false;
     }
 
-    // ✅ Mumbai boundary
-    $mumbai_min_lat = 18.89;
-    $mumbai_max_lat = 19.52;
-    $mumbai_min_lng = 72.74;
-    $mumbai_max_lng = 73.244964;
-
-    function isWithinMumbai($lat, $lng, $minLat, $maxLat, $minLng, $maxLng) {
-        return ($lat >= $minLat && $lat <= $maxLat && $lng >= $minLng && $lng <= $maxLng);
+    // ✅ Geocode function (already exists)
+    // Let's add getDistance function
+    if (!function_exists('getDistance')) {
+        function getDistance($lat1, $lon1, $lat2, $lon2) {
+            $earth_radius = 6371; // Earth radius in km
+            $dLat = deg2rad($lat2 - $lat1);
+            $dLon = deg2rad($lon2 - $lon1);
+            $a = sin($dLat / 2) * sin($dLat / 2) +
+                 cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+                 sin($dLon / 2) * sin($dLon / 2);
+            $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+            return $earth_radius * $c; // Distance in km
+        }
     }
 
     $fromCoords = getCoordinates($from_address);
@@ -85,11 +90,19 @@ try {
         exit;
     }
 
-    $fromInMumbai = isWithinMumbai($fromCoords['lat'], $fromCoords['lng'], $mumbai_min_lat, $mumbai_max_lat, $mumbai_min_lng, $mumbai_max_lng);
-    $toInMumbai   = isWithinMumbai($toCoords['lat'], $toCoords['lng'], $mumbai_min_lat, $mumbai_max_lat, $mumbai_min_lng, $mumbai_max_lng);
+    // Check if within 300km of Mumbai Center (for testing)
+    $mumbai_center_lat = 19.0760;
+    $mumbai_center_lng = 72.8777;
+    $radius_km = 300; // Testing radius
+
+    $from_distance = getDistance($mumbai_center_lat, $mumbai_center_lng, $fromCoords['lat'], $fromCoords['lng']);
+    $to_distance = getDistance($mumbai_center_lat, $mumbai_center_lng, $toCoords['lat'], $toCoords['lng']);
+
+    $fromInAllowedRadius = ($from_distance <= $radius_km);
+    $toInAllowedRadius   = ($to_distance <= $radius_km);
 
     // ✅ Determine booking status
-    $booking_status = ($fromInMumbai && $toInMumbai) ? "Pending" : "Go back & Select One Way";
+    $booking_status = ($fromInAllowedRadius && $toInAllowedRadius) ? "Pending" : "Go back & Select One Way";
 
     $current_date = date('Y-m-d');
     $current_time = date('H:i:s');

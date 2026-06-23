@@ -26,7 +26,7 @@ if ($geoData['status'] == 'OK') {
 } else {
     die("Error: Unable to get location coordinates.");
 }
-$radius_km = 20;
+$radius_km = 300;
 
 
 function getDistance($lat1, $lon1, $lat2, $lon2) {
