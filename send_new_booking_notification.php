@@ -2,6 +2,19 @@
 require_once __DIR__ . '/vendor/autoload.php';
 use Google\Auth\Credentials\ServiceAccountCredentials;
 
+if (!function_exists('getDistance')) {
+    function getDistance($lat1, $lon1, $lat2, $lon2) {
+        $earth_radius = 6371; // Earth radius in km
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLon = deg2rad($lon2 - $lon1);
+        $a = sin($dLat / 2) * sin($dLat / 2) +
+             cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+             sin($dLon / 2) * sin($dLon / 2);
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+        return $earth_radius * $c; // Distance in km
+    }
+}
+
 function getFcmAccessToken() {
     $googleAccountKeyFilePath = __DIR__ . '/agni-car-app-firebase-adminsdk-fbsvc-4f70f7d1f2.json';
     if (!file_exists($googleAccountKeyFilePath)) {
@@ -84,10 +97,29 @@ function trigger_new_booking_notification($booking_id) {
     $pickup_location = $booking['from_address'] ?? '';
     $drop_location = $booking['to_address'] ?? '';
     $vendor_amount = $booking['vendor_amount'] ?? '0.00';
+
+    // Geocode customer's pickup address using Google Geocoding API
+    $googleMapsApiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM';
+    $geocodeUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=" . urlencode($pickup_location) . "&key=$googleMapsApiKey";
     
-    // 2. Fetch active vendors/drivers with FCM tokens
+    $ref_lat = null;
+    $ref_lon = null;
+    try {
+        $geoResponse = file_get_contents($geocodeUrl);
+        if ($geoResponse) {
+            $geoData = json_decode($geoResponse, true);
+            if ($geoData['status'] === 'OK') {
+                $ref_lat = $geoData['results'][0]['geometry']['location']['lat'];
+                $ref_lon = $geoData['results'][0]['geometry']['location']['lng'];
+            }
+        }
+    } catch (Throwable $e) {
+        error_log("Geocoding failed for notification: " . $e->getMessage());
+    }
+    
+    // 2. Fetch active vendors/drivers with FCM tokens, latitude, and longitude
     // Includes userType='vendor' AND empty userType (some vendors register without userType set)
-    $vendors_sql = "SELECT fcm_token FROM drivers WHERE status = 'active' AND (userType = 'vendor' OR userType = '' OR userType IS NULL) AND fcm_token IS NOT NULL AND fcm_token != ''";
+    $vendors_sql = "SELECT fcm_token, latitude, longitude FROM drivers WHERE status = 'active' AND (userType = 'vendor' OR userType = '' OR userType IS NULL) AND fcm_token IS NOT NULL AND fcm_token != ''";
     $vendors_res = mysqli_query($conn, $vendors_sql);
     if (!$vendors_res) {
         error_log("Notification DB Error fetching vendors: " . mysqli_error($conn));
@@ -95,12 +127,19 @@ function trigger_new_booking_notification($booking_id) {
     }
     
     $tokens = [];
+    $radius_km = 20;
     while ($row = mysqli_fetch_assoc($vendors_res)) {
+        if ($ref_lat !== null && $ref_lon !== null && !empty($row['latitude']) && !empty($row['longitude'])) {
+            $distance = getDistance($ref_lat, $ref_lon, $row['latitude'], $row['longitude']);
+            if ($distance > $radius_km) {
+                continue; // Skip vendors further than 20km
+            }
+        }
         $tokens[] = $row['fcm_token'];
     }
     
     if (empty($tokens)) {
-        error_log("Notification Info: No active vendors with FCM tokens found.");
+        error_log("Notification Info: No active vendors within 20km with FCM tokens found.");
         return;
     }
     
