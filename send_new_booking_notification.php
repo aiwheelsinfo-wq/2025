@@ -127,7 +127,7 @@ function trigger_new_booking_notification($booking_id) {
     }
     
     $tokens = [];
-    $radius_km = 20;
+    $radius_km = 300;
     while ($row = mysqli_fetch_assoc($vendors_res)) {
         if ($ref_lat !== null && $ref_lon !== null && !empty($row['latitude']) && !empty($row['longitude'])) {
             $distance = getDistance($ref_lat, $ref_lon, $row['latitude'], $row['longitude']);
