@@ -52,7 +52,7 @@ if ($booking_id <= 0) {
 }
 
 // 1. Fetch booking details using prepared statement
-$stmt = $conn->prepare("SELECT id, date, time, total_amount, paid_amount, payment_type, booking_status, vender_id, driver_id FROM bookings WHERE id = ?");
+$stmt = $conn->prepare("SELECT id, trip_type, date, time, total_amount, paid_amount, payment_type, booking_status, vender_id, driver_id FROM bookings WHERE id = ?");
 $stmt->bind_param("i", $booking_id);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -99,40 +99,56 @@ if ($diff_hours <= 0) {
     exit;
 }
 
-// 4. Determine refund percentage based on pickup hours
-$refund_percentage = 0.00;
-if ($diff_hours >= 48) {
-    $refund_percentage = (float)$policy['refund_above_48h'];
-} elseif ($diff_hours >= 24) {
-    $refund_percentage = (float)$policy['refund_24_48h'];
-} elseif ($diff_hours >= 12) {
-    $refund_percentage = (float)$policy['refund_12_24h'];
-} elseif ($diff_hours >= 6) {
-    $refund_percentage = (float)$policy['refund_6_12h'];
-} else {
-    $refund_percentage = (float)$policy['refund_below_6h'];
+// Check if this is a Local Taxi booking
+$isLocalTaxi = false;
+if (isset($booking['trip_type'])) {
+    $tripTypeLower = strtolower($booking['trip_type']);
+    if (strpos($tripTypeLower, 'local') !== false && strpos($tripTypeLower, 'taxi') !== false) {
+        $isLocalTaxi = true;
+    }
 }
 
-// Calculate values based on advance paid
+// 4. Determine calculations and refund percentage
+$refund_percentage = 0.00;
 $trip_amount = (float)$booking['total_amount'];
 $advance_paid = (float)$booking['paid_amount'];
-
-$refund_amount = $advance_paid * ($refund_percentage / 100.0);
-$cancellation_charge = $advance_paid - $refund_amount;
-
-// Calculate vendor compensation (vendor protection)
 $vendor_compensation = 0.00;
-if (!empty($booking['vender_id']) || !empty($booking['driver_id'])) {
-    $vendor_comp_percent = 0.00;
-    if ($diff_hours >= 24) {
-        $vendor_comp_percent = (float)$policy['vendor_comp_above_24h'];
+
+if ($isLocalTaxi) {
+    // Local Taxi rules: free cancellation, 100% refund, 0 charges, 0 vendor compensation
+    $refund_percentage = 100.00;
+    $refund_amount = $advance_paid;
+    $cancellation_charge = 0.00;
+} else {
+    // Standard calculation based on pickup hours
+    if ($diff_hours >= 48) {
+        $refund_percentage = (float)$policy['refund_above_48h'];
+    } elseif ($diff_hours >= 24) {
+        $refund_percentage = (float)$policy['refund_24_48h'];
+    } elseif ($diff_hours >= 12) {
+        $refund_percentage = (float)$policy['refund_12_24h'];
     } elseif ($diff_hours >= 6) {
-        $vendor_comp_percent = (float)$policy['vendor_comp_6_24h'];
+        $refund_percentage = (float)$policy['refund_6_12h'];
     } else {
-        $vendor_comp_percent = (float)$policy['vendor_comp_below_6h'];
+        $refund_percentage = (float)$policy['refund_below_6h'];
     }
-    // Compensation is a percentage of the cancellation charge
-    $vendor_compensation = $cancellation_charge * ($vendor_comp_percent / 100.0);
+
+    $refund_amount = $advance_paid * ($refund_percentage / 100.0);
+    $cancellation_charge = $advance_paid - $refund_amount;
+
+    // Calculate vendor compensation (vendor protection)
+    if (!empty($booking['vender_id']) || !empty($booking['driver_id'])) {
+        $vendor_comp_percent = 0.00;
+        if ($diff_hours >= 24) {
+            $vendor_comp_percent = (float)$policy['vendor_comp_above_24h'];
+        } elseif ($diff_hours >= 6) {
+            $vendor_comp_percent = (float)$policy['vendor_comp_6_24h'];
+        } else {
+            $vendor_comp_percent = (float)$policy['vendor_comp_below_6h'];
+        }
+        // Compensation is a percentage of the cancellation charge
+        $vendor_compensation = $cancellation_charge * ($vendor_comp_percent / 100.0);
+    }
 }
 
 // 5. Update booking record
@@ -140,17 +156,18 @@ $new_booking_status = "";
 $new_refund_status = "";
 $new_vendor_comp_status = ($vendor_compensation > 0) ? 'Pending' : null;
 
-if ((int)$policy['manual_approval'] === 1) {
-    $new_booking_status = 'Cancellation Requested';
-    $new_refund_status = 'Pending Approval';
+if ($isLocalTaxi) {
+    $new_booking_status = 'Cancelled';
+    $new_refund_status = ((int)$policy['auto_refund'] === 1) ? 'Completed' : 'Processing';
 } else {
-    // Use 'Customer Cancelled' so the driver app can distinguish this from
-    // driver-side cancellations and move it to Cancellation History.
-    $new_booking_status = 'Customer Cancelled';
-    if ((int)$policy['auto_refund'] === 1) {
-        $new_refund_status = 'Completed';
+    if ((int)$policy['manual_approval'] === 1) {
+        $new_booking_status = 'Cancellation Requested';
+        $new_refund_status = 'Pending Approval';
     } else {
-        $new_refund_status = 'Processing';
+        // Use 'Customer Cancelled' so the driver app can distinguish this from
+        // driver-side cancellations and move it to Cancellation History.
+        $new_booking_status = 'Customer Cancelled';
+        $new_refund_status = ((int)$policy['auto_refund'] === 1) ? 'Completed' : 'Processing';
     }
 }
 
@@ -223,18 +240,23 @@ if ($updateStmt->execute()) {
         }
 
         if (!empty($driver_fcm_token)) {
-            $refundText = ($refund_percentage > 0)
-                ? number_format($refund_amount, 2) . ' INR (' . number_format($refund_percentage, 0) . '% refund)'
-                : 'No refund applicable';
+            if ($isLocalTaxi) {
+                $notifBody = 'Booking #' . $booking_id . ' has been cancelled by customer.';
+            } else {
+                $refundText = ($refund_percentage > 0)
+                    ? number_format($refund_amount, 2) . ' INR (' . number_format($refund_percentage, 0) . '% refund)'
+                    : 'No refund applicable';
+                $notifBody = 'Booking #' . $booking_id . ' has been cancelled. '
+                           . 'Refund: ' . $refundText . '. '
+                           . 'Check Cancellation History for details.';
+            }
 
             $notifMessage = [
                 'message' => [
                     'token' => $driver_fcm_token,
                     'notification' => [
                         'title' => '⚠️ Trip Cancelled by Customer',
-                        'body'  => 'Booking #' . $booking_id . ' has been cancelled. '
-                                 . 'Refund: ' . $refundText . '. '
-                                 . 'Check Cancellation History for details.'
+                        'body'  => $notifBody
                     ],
                     'data' => [
                         'type'               => 'customer_cancelled',

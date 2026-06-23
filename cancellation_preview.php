@@ -18,7 +18,7 @@ if ($booking_id <= 0) {
 }
 
 // Fetch booking details using prepared statement to prevent SQL Injection
-$stmt = $conn->prepare("SELECT id, date, time, total_amount, paid_amount, payment_type, booking_status, vender_id, driver_id FROM bookings WHERE id = ?");
+$stmt = $conn->prepare("SELECT id, trip_type, date, time, total_amount, paid_amount, payment_type, booking_status, vender_id, driver_id FROM bookings WHERE id = ?");
 $stmt->bind_param("i", $booking_id);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -65,40 +65,56 @@ if ($diff_hours <= 0) {
     exit;
 }
 
-// Determine refund percentage based on pickup hours
-$refund_percentage = 0.00;
-if ($diff_hours >= 48) {
-    $refund_percentage = (float)$policy['refund_above_48h'];
-} elseif ($diff_hours >= 24) {
-    $refund_percentage = (float)$policy['refund_24_48h'];
-} elseif ($diff_hours >= 12) {
-    $refund_percentage = (float)$policy['refund_12_24h'];
-} elseif ($diff_hours >= 6) {
-    $refund_percentage = (float)$policy['refund_6_12h'];
-} else {
-    $refund_percentage = (float)$policy['refund_below_6h'];
+// Check if this is a Local Taxi booking
+$isLocalTaxi = false;
+if (isset($booking['trip_type'])) {
+    $tripTypeLower = strtolower($booking['trip_type']);
+    if (strpos($tripTypeLower, 'local') !== false && strpos($tripTypeLower, 'taxi') !== false) {
+        $isLocalTaxi = true;
+    }
 }
 
-// Calculate values based on advance paid
+// Determine calculations and refund percentage
+$refund_percentage = 0.00;
 $trip_amount = (float)$booking['total_amount'];
 $advance_paid = (float)$booking['paid_amount'];
-
-$refund_amount = $advance_paid * ($refund_percentage / 100.0);
-$cancellation_charge = $advance_paid - $refund_amount;
-
-// Calculate vendor compensation (vendor protection)
 $vendor_compensation = 0.00;
-if (!empty($booking['vender_id']) || !empty($booking['driver_id'])) {
-    $vendor_comp_percent = 0.00;
-    if ($diff_hours >= 24) {
-        $vendor_comp_percent = (float)$policy['vendor_comp_above_24h'];
+
+if ($isLocalTaxi) {
+    // Local Taxi rules: free cancellation, 100% refund, 0 charges, 0 vendor compensation
+    $refund_percentage = 100.00;
+    $refund_amount = $advance_paid;
+    $cancellation_charge = 0.00;
+} else {
+    // Standard calculation based on pickup hours
+    if ($diff_hours >= 48) {
+        $refund_percentage = (float)$policy['refund_above_48h'];
+    } elseif ($diff_hours >= 24) {
+        $refund_percentage = (float)$policy['refund_24_48h'];
+    } elseif ($diff_hours >= 12) {
+        $refund_percentage = (float)$policy['refund_12_24h'];
     } elseif ($diff_hours >= 6) {
-        $vendor_comp_percent = (float)$policy['vendor_comp_6_24h'];
+        $refund_percentage = (float)$policy['refund_6_12h'];
     } else {
-        $vendor_comp_percent = (float)$policy['vendor_comp_below_6h'];
+        $refund_percentage = (float)$policy['refund_below_6h'];
     }
-    // Compensation is a percentage of the cancellation charge
-    $vendor_compensation = $cancellation_charge * ($vendor_comp_percent / 100.0);
+
+    $refund_amount = $advance_paid * ($refund_percentage / 100.0);
+    $cancellation_charge = $advance_paid - $refund_amount;
+
+    // Calculate vendor compensation (vendor protection)
+    if (!empty($booking['vender_id']) || !empty($booking['driver_id'])) {
+        $vendor_comp_percent = 0.00;
+        if ($diff_hours >= 24) {
+            $vendor_comp_percent = (float)$policy['vendor_comp_above_24h'];
+        } elseif ($diff_hours >= 6) {
+            $vendor_comp_percent = (float)$policy['vendor_comp_6_24h'];
+        } else {
+            $vendor_comp_percent = (float)$policy['vendor_comp_below_6h'];
+        }
+        // Compensation is a percentage of the cancellation charge
+        $vendor_compensation = $cancellation_charge * ($vendor_comp_percent / 100.0);
+    }
 }
 
 echo json_encode([

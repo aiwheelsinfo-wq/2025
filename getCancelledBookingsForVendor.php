@@ -51,7 +51,7 @@ $stmt = $conn->prepare("
     FROM bookings b
     LEFT JOIN users u ON u.phone_number = b.mobile
     WHERE b.vender_id = ?
-      AND b.booking_status IN ('Customer Cancelled', 'Cancellation Requested')
+      AND b.booking_status IN ('Customer Cancelled', 'Cancellation Requested', 'Cancelled')
     ORDER BY b.cancelled_at DESC
     LIMIT 50
 ");
