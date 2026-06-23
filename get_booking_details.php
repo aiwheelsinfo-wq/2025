@@ -24,6 +24,8 @@ $sql = "SELECT
             b.agni_amount,
             b.paid_amount,
             b.base_charge,
+            b.booking_status,
+            b.vender_id,
             u.name AS customer_name
         FROM bookings b
         LEFT JOIN users u ON b.mobile = u.phone_number
