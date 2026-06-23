@@ -84,7 +84,7 @@ try {
     }
 
     // Fetch ALL vendor tokens from database
-    $sql = "SELECT driver_id, name, phone, fcm_token, userType, status 
+    $sql = "SELECT driver_id, full_name, phone_number, fcm_token, userType, status 
             FROM drivers 
             WHERE userType = 'vendor' 
             AND fcm_token IS NOT NULL 
@@ -160,8 +160,8 @@ try {
 
         $report[] = [
             'vendor_id' => $vendor['driver_id'],
-            'name' => $vendor['name'],
-            'phone' => $vendor['phone'],
+            'name' => $vendor['full_name'],
+            'phone' => $vendor['phone_number'],
             'db_status' => $vendor['status'],
             'token_preview' => substr($token, 0, 25) . '...',
             'fcm_status' => $status,
