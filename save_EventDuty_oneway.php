@@ -91,6 +91,14 @@ VALUES
 
 if (mysqli_query($conn, $insertBookingSql)) {
     $booking_id = mysqli_insert_id($conn);
+
+    try {
+        require_once __DIR__ . '/send_new_booking_notification.php';
+        trigger_new_booking_notification($booking_id);
+    } catch (Throwable $e) {
+        error_log("FCM Notification error: " . $e->getMessage());
+    }
+
     echo json_encode([
         "success" => true,
         "message" => "Booking created successfully",

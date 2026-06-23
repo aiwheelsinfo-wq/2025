@@ -103,6 +103,7 @@ $gst_number=$_POST['gst_number'];
 $business_name=$_POST['business_name'];
 $business_address=$_POST['business_address'];
 $business_pincode = $_POST['business_pincode'];
+$final_booking_id = null;
 date_default_timezone_set('Asia/Kolkata');
 $booked_at = date('Y-m-d H:i:s');
 $bookingId = $_POST['bookingId'];
@@ -198,6 +199,7 @@ if (mysqli_query($conn, $updateBookingSql)) {
     $response["success"] = true;
     $response["message"] = "Booking updated successfully";
     $response["booking_id"] = $bookingId;
+    $final_booking_id = $bookingId;
 } else {
     $response["success"] = false;
     $response["message"] = "Error: " . mysqli_error($conn);
@@ -220,6 +222,7 @@ if (mysqli_query($conn, $insertBookingSql)) {
     $response["success"] = true;
     $response["message"] = "Booking saved successfully";
     $response["booking_id"] = $booking_id;
+    $final_booking_id = $booking_id;
 } else {
     $response["success"] = false;
     $response["message"] = "Error: " . mysqli_error($conn);
@@ -293,23 +296,9 @@ if ($bookerTokenResult && mysqli_num_rows($bookerTokenResult) > 0) {
 
 
 try {
-    foreach ($deviceTokens as $index => $token) {
-        $deviceToken = htmlspecialchars($token);
-       
-
-
-        $message = [
-            'message' => [
-                'token' => $deviceToken,
-                'notification' => [
-                    'title' => 'RENTOX RIDE',
-                    'body' => 'New Trip Added in your app.'
-                ]
-            ]
-        ];
-
-
-        $response = sendFcmMessage($projectId, $message);
+    if (!empty($final_booking_id)) {
+        require_once __DIR__ . '/send_new_booking_notification.php';
+        trigger_new_booking_notification($final_booking_id);
     }
 
     if (!empty($fcm_bookerToken)) {

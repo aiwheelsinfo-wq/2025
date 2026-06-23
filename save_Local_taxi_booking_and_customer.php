@@ -199,11 +199,20 @@ try {
     );
 
     if ($booking_stmt->execute()) {
+        $booking_id = $conn->insert_id;
         $conn->commit();
+        
+        try {
+            require_once __DIR__ . '/send_new_booking_notification.php';
+            trigger_new_booking_notification($booking_id);
+        } catch (Throwable $e) {
+            error_log("FCM Notification error: " . $e->getMessage());
+        }
+
         echo json_encode([
             "status" => "success",
             "message" => "Booking and customer data saved successfully",
-            "booking_id" => $conn->insert_id,
+            "booking_id" => $booking_id,
             "booking_status" => $booking_status
         ]);
     } else {
