@@ -192,7 +192,7 @@ if($trip_type == 'One-way' && !empty($bookingId)){
     business_name = '$business_name',
     business_address = '$business_address',
     business_pincode = '$business_pincode',
-    booking_status = 'Pending'
+    booking_status = 'temp'
 WHERE id = '$bookingId'"; // Assumes 'id' is the primary key column name
 
 if (mysqli_query($conn, $updateBookingSql)) {
@@ -213,7 +213,7 @@ else{
 
 // 🔽 Now insert booking info into `bookings` table (only relevant fields)
 $insertBookingSql = "INSERT INTO bookings (trip_type, car_type, from_address, to_address, distance, date, time,booked_at, mobile, agent_commission, base_charge, driver_ta, toll_charge, total_amount, payment_type, return_date, return_time, otp, agni_amount, vendor_amount, booker_id, gst, gst_number, business_name, business_address, business_pincode, booking_status)
-VALUES ('$trip_type', '$car_type', '$from_address', '$to_address', '$distance', '$date', '$tripTime', '$booked_at', '$contact_number', '$agent_commission', '$base_charge', '$driver_ta', '$toll_charge', '$total_amount', '$payment_type', '$return_date', '$return_time', '$otp', '$agni_amount', '$vendor_amount', '$userNumber', '$gst', '$gst_number', '$business_name', '$business_address', '$business_pincode', 'Pending')";
+VALUES ('$trip_type', '$car_type', '$from_address', '$to_address', '$distance', '$date', '$tripTime', '$booked_at', '$contact_number', '$agent_commission', '$base_charge', '$driver_ta', '$toll_charge', '$total_amount', '$payment_type', '$return_date', '$return_time', '$otp', '$agni_amount', '$vendor_amount', '$userNumber', '$gst', '$gst_number', '$business_name', '$business_address', '$business_pincode', 'temp')";
 
 
 if (mysqli_query($conn, $insertBookingSql)) {
@@ -295,28 +295,7 @@ if ($bookerTokenResult && mysqli_num_rows($bookerTokenResult) > 0) {
 }
 
 
-try {
-    if (!empty($final_booking_id)) {
-        require_once __DIR__ . '/send_new_booking_notification.php';
-        trigger_new_booking_notification($final_booking_id);
-    }
-
-    if (!empty($fcm_bookerToken)) {
-        $message = [
-            'message' => [
-                'token' => $fcm_bookerToken,
-                'notification' => [
-                    'title' => 'AGNI RENTAL ADMIN',
-                    'body' => 'We have a new Trip! Check the list'
-                ]
-            ]
-        ];
-
-        $response = sendFcmMessage($projectId, $message);
-    }
-} catch (Throwable $e) {
-    // Ignore notification errors to ensure client receives the confirmation response
-}
+// FCM notifications have been moved to updatePayment.php to implement payment-first flow
 
 
 mysqli_close($conn);
