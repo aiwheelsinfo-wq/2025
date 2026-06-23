@@ -67,8 +67,11 @@ function sendSingleFcmNotification($accessToken, $projectId, $token, $notificati
 
 // 1. Fetch latest booking
 $booking_query = mysqli_query($conn, "SELECT id, trip_type, from_address, to_address, vendor_amount FROM bookings ORDER BY id DESC LIMIT 1");
-if (!$booking_query || mysqli_num_rows($booking_query) === 0) {
-    die("No bookings found in database.\n");
+if (!$booking_query) {
+    die("Query failed: " . mysqli_error($conn) . "\n");
+}
+if (mysqli_num_rows($booking_query) === 0) {
+    die("No bookings found in database. Num rows is 0.\n");
 }
 $booking = mysqli_fetch_assoc($booking_query);
 echo "=== LATEST BOOKING DETAILS ===\n";
