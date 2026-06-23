@@ -30,7 +30,7 @@ if (!$booking) {
     exit;
 }
 
-$non_cancellable = ['Completed', 'Cancelled', 'Declined', 'Failed', 'Deleted', 'Cancellation Requested'];
+$non_cancellable = ['Completed', 'Cancelled', 'Declined', 'Failed', 'Deleted', 'Cancellation Requested', 'Started', 'Ongoing'];
 if (in_array($booking['booking_status'], $non_cancellable)) {
     echo json_encode([
         "status" => "error", 
@@ -53,18 +53,6 @@ if ((int)$policy['cancellation_enabled'] === 0) {
     exit;
 }
 
-// Calculate time remaining before pickup
-$pickup_str = $booking['date'] . ' ' . $booking['time'];
-$pickup_ts = strtotime($pickup_str);
-$current_ts = time(); // Server time in Asia/Kolkata
-$diff_seconds = $pickup_ts - $current_ts;
-$diff_hours = $diff_seconds / 3600.0;
-
-if ($diff_hours <= 0) {
-    echo json_encode(["status" => "error", "message" => "Trip has already started or is in the past. Cancellation is not allowed."]);
-    exit;
-}
-
 // Check if this is a Local Taxi booking
 $isLocalTaxi = false;
 if (isset($booking['trip_type'])) {
@@ -72,6 +60,22 @@ if (isset($booking['trip_type'])) {
     if (strpos($tripTypeLower, 'local') !== false && strpos($tripTypeLower, 'taxi') !== false) {
         $isLocalTaxi = true;
     }
+}
+
+// Calculate time remaining before pickup
+if (!$isLocalTaxi) {
+    $pickup_str = $booking['date'] . ' ' . $booking['time'];
+    $pickup_ts = strtotime($pickup_str);
+    $current_ts = time(); // Server time in Asia/Kolkata
+    $diff_seconds = $pickup_ts - $current_ts;
+    $diff_hours = $diff_seconds / 3600.0;
+
+    if ($diff_hours <= 0) {
+        echo json_encode(["status" => "error", "message" => "Trip has already started or is in the past. Cancellation is not allowed."]);
+        exit;
+    }
+} else {
+    $diff_hours = 0.0;
 }
 
 // Determine calculations and refund percentage
