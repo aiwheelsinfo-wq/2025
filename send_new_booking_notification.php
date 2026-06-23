@@ -104,7 +104,8 @@ function trigger_new_booking_notification($booking_id) {
     }
     
     // 3. Prepare FCM message
-    $projectId = 'agni-car-app';
+    $keyFileContent = json_decode(file_get_contents(__DIR__ . '/agni-car-app-firebase-adminsdk-fbsvc-4f70f7d1f2.json'), true);
+    $projectId = $keyFileContent['project_id'] ?? 'agnicarrentaldriver-8fb07';
     $notificationData = [
         'title' => 'New Trip Available',
         'body' => 'You have received a new trip request. Open the app to view details.',
