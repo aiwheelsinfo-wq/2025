@@ -165,9 +165,10 @@ try {
         $user_stmt->close();
     }
 
-    // Calculate split: 20% platform commission, 80% partner earning
-    $agni_amount = $total_amount * 0.20;
-    $vendor_amount = $total_amount - $agni_amount;
+    // For Local Taxi bookings, the Vendor Earnings must be exactly equal to the Customer Paid Amount.
+    // Vendor receives 100% of the booking amount. No Agni commission or platform fee is deducted.
+    $agni_amount = 0;
+    $vendor_amount = $total_amount;
 
     // ✅ Insert booking
     $booking_sql = "INSERT INTO bookings (

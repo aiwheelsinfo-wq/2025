@@ -54,12 +54,13 @@ try {
     $current_date = date('Y-m-d');
     $current_time = date('H:i:s');
 
-    $agni_amount = $total_amount * 0.20;
-    $vendor_amount = $total_amount - $agni_amount;
+    // Local Taxi: Vendor receives 100% — no Agni commission or platform fee deducted.
+    $agni_amount = 0;
+    $vendor_amount = $total_amount;
 
     // Prepare SQL statement
     $sql = "INSERT INTO bookings (from_address, to_address, distance, car_type, total_amount, trip_type, date, time, mobile, vendor_amount, agni_amount, otp) 
-            VALUES (?, ?, ?, ?, ?, 'Local taxi', ?, ?, ?, ?, ?, ?)";
+            VALUES (?, ?, ?, ?, ?, 'Local-taxi', ?, ?, ?, ?, ?, ?)";
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
         echo json_encode(["status" => "error", "message" => "Query preparation failed"]);
