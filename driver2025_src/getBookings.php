@@ -6,68 +6,9 @@ $vendor_phone = $_POST['phone_number'] ?? null;
 $driver_phone = $_POST['phone_number'] ?? null;
 $currentDate = date('Y-m-d');
 
-if (!function_exists('getDistance')) {
-    function getDistance($lat1, $lon1, $lat2, $lon2) {
-        $earth_radius = 6371; // Earth radius in km
-        $dLat = deg2rad($lat2 - $lat1);
-        $dLon = deg2rad($lon2 - $lon1);
-        $a = sin($dLat / 2) * sin($dLat / 2) +
-             cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
-             sin($dLon / 2) * sin($dLon / 2);
-        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
-        return $earth_radius * $c; // Distance in km
-    }
-}
-
-$geocodeCache = [];
-if (!function_exists('geocodeAddress')) {
-    function geocodeAddress($address, $apiKey) {
-        global $geocodeCache;
-        if (isset($geocodeCache[$address])) {
-            return $geocodeCache[$address];
-        }
-        $geocodeUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=" . urlencode($address) . "&key=$apiKey";
-        try {
-            $geoResponse = file_get_contents($geocodeUrl);
-            if ($geoResponse) {
-                $geoData = json_decode($geoResponse, true);
-                if ($geoData['status'] === 'OK') {
-                    $coords = [
-                        'lat' => $geoData['results'][0]['geometry']['location']['lat'],
-                        'lng' => $geoData['results'][0]['geometry']['location']['lng']
-                    ];
-                    $geocodeCache[$address] = $coords;
-                    return $coords;
-                }
-            }
-        } catch (Throwable $e) {
-            error_log("Geocoding failed inside getBookings: " . $e->getMessage());
-        }
-        return null;
-    }
-}
-
 try {
     if (!$conn) {
         throw new Exception("Database connection failed.");
-    }
-
-    // Fetch vendor coordinates
-    $vendor_lat = null;
-    $vendor_lon = null;
-    if ($vendor_phone) {
-        $stmtVendor = $conn->prepare("SELECT latitude, longitude FROM drivers WHERE phone_number = ? LIMIT 1");
-        if ($stmtVendor) {
-            $stmtVendor->bind_param("s", $vendor_phone);
-            $stmtVendor->execute();
-            $resVendor = $stmtVendor->get_result();
-            if ($resVendor->num_rows > 0) {
-                $vendorData = $resVendor->fetch_assoc();
-                $vendor_lat = !empty($vendorData['latitude']) ? floatval($vendorData['latitude']) : null;
-                $vendor_lon = !empty($vendorData['longitude']) ? floatval($vendorData['longitude']) : null;
-            }
-            $stmtVendor->close();
-        }
     }
 
     // ===================== Fetch Accepted Bookings =====================
@@ -224,22 +165,8 @@ try {
         $driver_allowance, $vendor_amount, $agni_share, $driver_name, $vendor_name
     );
 
-    $googleMapsApiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM';
-    $radius_km = 20;
     $bookings = [];
-
     while ($stmtPending->fetch()) {
-        // Geofence: Filter pending bookings within 20km from the vendor's location
-        if ($vendor_lat !== null && $vendor_lon !== null && !empty($from_address)) {
-            $coords = geocodeAddress($from_address, $googleMapsApiKey);
-            if ($coords !== null) {
-                $distanceCalc = getDistance($vendor_lat, $vendor_lon, $coords['lat'], $coords['lng']);
-                if ($distanceCalc > $radius_km) {
-                    continue; // Skip pending bookings further than 20km
-                }
-            }
-        }
-
         $bookings[] = [
             "booking_id" => $booking_id,
             "car_type" => $car_type,
