@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "704229396210",
-    "project_id": "agni-car-app",
-    "storage_bucket": "agni-car-app.firebasestorage.app"
+    "project_number": "1006622748598",
+    "project_id": "agnicarrentaldriver-8fb07",
+    "storage_bucket": "agnicarrentaldriver-8fb07.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:704229396210:android:7ff001942b7660bdde0a6b",
+        "mobilesdk_app_id": "1:1006622748598:android:dc364a107b815ebdbc1b17",
         "android_client_info": {
           "package_name": "com.AgniDriver.agnidriver2025"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAPxJvzK1HxsvEzPU2omrjUVgKnhKzHrA8"
+          "current_key": "AIzaSyD8ek1VqFekyprDlnfWivoCzXDuxQQgCyI"
         }
       ],
       "services": {
@@ -26,7 +26,7 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:704229396210:android:f232ecadfce6b1e6de0a6b",
+        "mobilesdk_app_id": "1:1006622748598:android:22a694416b3bb54fbc1b17",
         "android_client_info": {
           "package_name": "com.agni.agni_car_rental"
         }
@@ -34,7 +34,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAPxJvzK1HxsvEzPU2omrjUVgKnhKzHrA8"
+          "current_key": "AIzaSyD8ek1VqFekyprDlnfWivoCzXDuxQQgCyI"
         }
       ],
       "services": {
@@ -45,15 +45,34 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:704229396210:android:2b9533bada0622e1de0a6b",
+        "mobilesdk_app_id": "1:1006622748598:android:08031c23c0d62803bc1b17",
         "android_client_info": {
-          "package_name": "com.example.fcm_test"
+          "package_name": "com.agni.agnidriver2025"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAPxJvzK1HxsvEzPU2omrjUVgKnhKzHrA8"
+          "current_key": "AIzaSyD8ek1VqFekyprDlnfWivoCzXDuxQQgCyI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1006622748598:android:14d51cff83fe40f0bc1b17",
+        "android_client_info": {
+          "package_name": "com.example.firebase_test"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD8ek1VqFekyprDlnfWivoCzXDuxQQgCyI"
         }
       ],
       "services": {
