@@ -65,7 +65,16 @@ function sendSingleFcmNotification($accessToken, $projectId, $token, $notificati
     return ['code' => $httpCode, 'response' => json_decode($result, true), 'raw' => $result];
 }
 
-// 1. Fetch latest booking
+// 1. Fetch table counts
+$bookings_cnt_q = mysqli_query($conn, "SELECT COUNT(*) as cnt FROM bookings");
+$drivers_cnt_q = mysqli_query($conn, "SELECT COUNT(*) as cnt FROM drivers");
+$bookings_cnt = $bookings_cnt_q ? mysqli_fetch_assoc($bookings_cnt_q)['cnt'] : 'Error: ' . mysqli_error($conn);
+$drivers_cnt = $drivers_cnt_q ? mysqli_fetch_assoc($drivers_cnt_q)['cnt'] : 'Error: ' . mysqli_error($conn);
+
+echo "=== DATABASE TABLE COUNTS ===\n";
+echo "Bookings count: $bookings_cnt\n";
+echo "Drivers count: $drivers_cnt\n\n";
+
 $booking_query = mysqli_query($conn, "SELECT id, trip_type, from_address, to_address, vendor_amount FROM bookings ORDER BY id DESC LIMIT 1");
 if (!$booking_query) {
     die("Query failed: " . mysqli_error($conn) . "\n");
@@ -74,12 +83,6 @@ if (mysqli_num_rows($booking_query) === 0) {
     die("No bookings found in database. Num rows is 0.\n");
 }
 $booking = mysqli_fetch_assoc($booking_query);
-echo "=== LATEST BOOKING DETAILS ===\n";
-echo "ID: " . $booking['id'] . "\n";
-echo "Trip Type: " . $booking['trip_type'] . "\n";
-echo "Pickup: " . $booking['from_address'] . "\n";
-echo "Drop: " . $booking['to_address'] . "\n";
-echo "Amount: " . $booking['vendor_amount'] . "\n\n";
 
 // 2. Geocode pickup location
 $googleMapsApiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM';
