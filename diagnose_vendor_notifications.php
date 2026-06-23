@@ -84,9 +84,9 @@ try {
     }
 
     // Fetch ALL vendor tokens from database
-    $sql = "SELECT driver_id, full_name, phone_number, fcm_token, userType, status, latitude, longitude 
+    $sql = "SELECT driver_id, full_name, phone_number, fcm_token, userType, status 
             FROM drivers 
-            WHERE (userType = 'vendor' OR userType = '' OR userType IS NULL) 
+            WHERE userType = 'vendor' 
             AND fcm_token IS NOT NULL 
             AND fcm_token != '' 
             ORDER BY driver_id DESC";
@@ -165,9 +165,7 @@ try {
             'db_status' => $vendor['status'],
             'token_preview' => substr($token, 0, 25) . '...',
             'fcm_status' => $status,
-            'error_code' => $error_code,
-            'latitude' => $vendor['latitude'],
-            'longitude' => $vendor['longitude']
+            'error_code' => $error_code
         ];
     }
 

@@ -129,24 +129,13 @@ function trigger_new_booking_notification($booking_id) {
     $tokens = [];
     $radius_km = 20;
     while ($row = mysqli_fetch_assoc($vendors_res)) {
-        $lat = floatval($row['latitude'] ?? 0);
-        $lon = floatval($row['longitude'] ?? 0);
-        
-        // If vendor coordinates are uninitialized (0,0), bypass distance check and include them
-        if ($lat == 0.0 && $lon == 0.0) {
-            $tokens[] = $row['fcm_token'];
-            continue;
-        }
-        
-        if ($ref_lat !== null && $ref_lon !== null) {
-            $distance = getDistance($ref_lat, $ref_lon, $lat, $lon);
-            if ($distance <= $radius_km) {
-                $tokens[] = $row['fcm_token'];
+        if ($ref_lat !== null && $ref_lon !== null && !empty($row['latitude']) && !empty($row['longitude'])) {
+            $distance = getDistance($ref_lat, $ref_lon, $row['latitude'], $row['longitude']);
+            if ($distance > $radius_km) {
+                continue; // Skip vendors further than 20km
             }
-        } else {
-            // Fallback: if geocoding failed, include them by default
-            $tokens[] = $row['fcm_token'];
         }
+        $tokens[] = $row['fcm_token'];
     }
     
     if (empty($tokens)) {
