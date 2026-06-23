@@ -84,9 +84,9 @@ function trigger_new_booking_notification($booking_id) {
     $pickup_location = $booking['from_address'] ?? '';
     $drop_location = $booking['to_address'] ?? '';
     
-    // 2. Fetch active vendors with FCM tokens
-    // Future scalability: radius-based filtering can be added here
-    $vendors_sql = "SELECT fcm_token FROM drivers WHERE status = 'active' AND userType = 'vendor' AND fcm_token IS NOT NULL AND fcm_token != ''";
+    // 2. Fetch active vendors/drivers with FCM tokens
+    // Includes userType='vendor' AND empty userType (some vendors register without userType set)
+    $vendors_sql = "SELECT fcm_token FROM drivers WHERE status = 'active' AND (userType = 'vendor' OR userType = '' OR userType IS NULL) AND fcm_token IS NOT NULL AND fcm_token != ''";
     $vendors_res = mysqli_query($conn, $vendors_sql);
     if (!$vendors_res) {
         error_log("Notification DB Error fetching vendors: " . mysqli_error($conn));
@@ -126,14 +126,30 @@ function trigger_new_booking_notification($booking_id) {
         return;
     }
     
-    // 4. Send one request per vendor token
+    // 4. Send one request per vendor token, auto-cleanup invalid tokens
     foreach ($tokens as $token) {
         $token = trim($token);
         if (empty($token)) {
             continue; // Skip invalid or empty FCM tokens
         }
         try {
-            sendSingleFcmNotification($accessToken, $projectId, $token, $notificationData);
+            $result = sendSingleFcmNotification($accessToken, $projectId, $token, $notificationData);
+            // Auto-cleanup invalid tokens from database
+            if ($result) {
+                $decoded = json_decode($result, true);
+                $errorCode = $decoded['error']['details'][0]['errorCode'] ?? null;
+                $httpStatus = $decoded['error']['status'] ?? null;
+                if ($errorCode === 'UNREGISTERED' || $errorCode === 'SENDER_ID_MISMATCH') {
+                    // Clean up this invalid token to prevent future failed sends
+                    $clean_stmt = $conn->prepare("UPDATE drivers SET fcm_token = NULL WHERE fcm_token = ?");
+                    if ($clean_stmt) {
+                        $clean_stmt->bind_param("s", $token);
+                        $clean_stmt->execute();
+                        $clean_stmt->close();
+                        error_log("FCM: Cleaned up invalid token ($errorCode): " . substr($token, 0, 30) . "...");
+                    }
+                }
+            }
         } catch (Throwable $e) {
             error_log("FCM Exception sending to token $token: " . $e->getMessage());
             // Continue sending notifications even if one vendor notification fails
