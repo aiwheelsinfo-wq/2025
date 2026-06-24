@@ -55,9 +55,9 @@ if ($tableCheck && $tableCheck->num_rows > 0) {
     }
 }
 
-// No default fallback discount for local taxi
+// Fallback to default 10% discount for <= 5 bookings if no database discount is active
 if ($discount_percent === 0 && $booking_count <= 5) {
-    $discount_percent = 0;
+    $discount_percent = 10;
 }
 
 // 2️⃣ Fetch fares
