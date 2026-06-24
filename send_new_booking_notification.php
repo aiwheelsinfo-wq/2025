@@ -66,7 +66,7 @@ function sendSingleFcmNotification($accessToken, $projectId, $token, $notificati
     return $result;
 }
 
-function trigger_new_booking_notification($booking_id) {
+function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon = null) {
     global $conn; // Access the database connection from the parent scope
     
     if (empty($booking_id)) {
@@ -98,23 +98,25 @@ function trigger_new_booking_notification($booking_id) {
     $drop_location = $booking['to_address'] ?? '';
     $vendor_amount = $booking['vendor_amount'] ?? '0.00';
 
-    // Geocode customer's pickup address using Google Geocoding API
-    $googleMapsApiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM';
-    $geocodeUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=" . urlencode($pickup_location) . "&key=$googleMapsApiKey";
-    
-    $ref_lat = null;
-    $ref_lon = null;
-    try {
-        $geoResponse = file_get_contents($geocodeUrl);
-        if ($geoResponse) {
-            $geoData = json_decode($geoResponse, true);
-            if ($geoData['status'] === 'OK') {
-                $ref_lat = $geoData['results'][0]['geometry']['location']['lat'];
-                $ref_lon = $geoData['results'][0]['geometry']['location']['lng'];
+    // Geocode customer's pickup address using Google Geocoding API if coordinates are not provided
+    if ($ref_lat === null || $ref_lon === null) {
+        $googleMapsApiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM';
+        $geocodeUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=" . urlencode($pickup_location) . "&key=$googleMapsApiKey";
+        
+        $ref_lat = null;
+        $ref_lon = null;
+        try {
+            $geoResponse = file_get_contents($geocodeUrl);
+            if ($geoResponse) {
+                $geoData = json_decode($geoResponse, true);
+                if ($geoData['status'] === 'OK') {
+                    $ref_lat = $geoData['results'][0]['geometry']['location']['lat'];
+                    $ref_lon = $geoData['results'][0]['geometry']['location']['lng'];
+                }
             }
+        } catch (Throwable $e) {
+            error_log("Geocoding failed for notification: " . $e->getMessage());
         }
-    } catch (Throwable $e) {
-        error_log("Geocoding failed for notification: " . $e->getMessage());
     }
     
     // 2. Fetch active vendors/drivers with FCM tokens, latitude, and longitude
@@ -129,7 +131,9 @@ function trigger_new_booking_notification($booking_id) {
     $tokens = [];
     $radius_km = 20;
     while ($row = mysqli_fetch_assoc($vendors_res)) {
-        if ($ref_lat !== null && $ref_lon !== null && !empty($row['latitude']) && !empty($row['longitude'])) {
+        if ($ref_lat !== null && $ref_lon !== null && 
+            !empty($row['latitude']) && !empty($row['longitude']) && 
+            floatval($row['latitude']) != 0 && floatval($row['longitude']) != 0) {
             $distance = getDistance($ref_lat, $ref_lon, $row['latitude'], $row['longitude']);
             if ($distance > $radius_km) {
                 continue; // Skip vendors further than 20km

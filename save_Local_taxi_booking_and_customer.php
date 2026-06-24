@@ -50,6 +50,11 @@ try {
     $total_amount   = floatval($data['total_amount']);
     $distance       = floatval($data['distance']);
 
+    $from_lat = (isset($data['from_lat']) && !empty(trim($data['from_lat']))) ? floatval($data['from_lat']) : null;
+    $from_lng = (isset($data['from_lng']) && !empty(trim($data['from_lng']))) ? floatval($data['from_lng']) : null;
+    $to_lat   = (isset($data['to_lat']) && !empty(trim($data['to_lat']))) ? floatval($data['to_lat']) : null;
+    $to_lng   = (isset($data['to_lng']) && !empty(trim($data['to_lng']))) ? floatval($data['to_lng']) : null;
+
     // ✅ Geocode function
     function getCoordinates($address) {
         $apiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM'; // Replace with your API key
@@ -67,29 +72,66 @@ try {
         return false;
     }
 
-    // ✅ Mumbai boundary
-    $mumbai_min_lat = 18.89;
-    $mumbai_max_lat = 19.52;
-    $mumbai_min_lng = 72.74;
-    $mumbai_max_lng = 73.244964;
-
-    function isWithinMumbai($lat, $lng, $minLat, $maxLat, $minLng, $maxLng) {
-        return ($lat >= $minLat && $lat <= $maxLat && $lng >= $minLng && $lng <= $maxLng);
+    if (!function_exists('getDistance')) {
+        function getDistance($lat1, $lon1, $lat2, $lon2) {
+            $earth_radius = 6371; // Earth radius in km
+            $dLat = deg2rad($lat2 - $lat1);
+            $dLon = deg2rad($lon2 - $lon1);
+            $a = sin($dLat / 2) * sin($dLat / 2) +
+                 cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+                 sin($dLon / 2) * sin($dLon / 2);
+            $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+            return $earth_radius * $c; // Distance in km
+        }
     }
 
-    $fromCoords = getCoordinates($from_address);
-    $toCoords   = getCoordinates($to_address);
+    if ($from_lat !== null && $from_lng !== null) {
+        $fromCoords = ['lat' => $from_lat, 'lng' => $from_lng];
+    } else {
+        $fromCoords = getCoordinates($from_address);
+    }
+
+    if ($to_lat !== null && $to_lng !== null) {
+        $toCoords = ['lat' => $to_lat, 'lng' => $to_lng];
+    } else {
+        $toCoords = getCoordinates($to_address);
+    }
 
     if (!$fromCoords || !$toCoords) {
         echo json_encode(["status" => "error", "message" => "Unable to geocode one or both addresses."]);
         exit;
     }
 
-    $fromInMumbai = isWithinMumbai($fromCoords['lat'], $fromCoords['lng'], $mumbai_min_lat, $mumbai_max_lat, $mumbai_min_lng, $mumbai_max_lng);
-    $toInMumbai   = isWithinMumbai($toCoords['lat'], $toCoords['lng'], $mumbai_min_lat, $mumbai_max_lat, $mumbai_min_lng, $mumbai_max_lng);
+    // Check if there is any active vendor within 20 km (or a vendor with unset coordinates)
+    $vendors_sql = "SELECT latitude, longitude FROM drivers WHERE status = 'active' AND (userType = 'vendor' OR userType = '' OR userType IS NULL)";
+    $vendors_res = $conn->query($vendors_sql);
+    
+    $vendor_found = false;
+    $radius_km = 20;
+
+    if ($vendors_res && $vendors_res->num_rows > 0) {
+        while ($row = $vendors_res->fetch_assoc()) {
+            // If vendor coordinates are unset (empty or 0.0), treat them as available globally (as fallback)
+            if (empty($row['latitude']) || empty($row['longitude']) || floatval($row['latitude']) == 0 || floatval($row['longitude']) == 0) {
+                $vendor_found = true;
+                break;
+            } else {
+                $dist = getDistance($fromCoords['lat'], $fromCoords['lng'], floatval($row['latitude']), floatval($row['longitude']));
+                if ($dist <= $radius_km) {
+                    $vendor_found = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!$vendor_found) {
+        echo json_encode(["status" => "error", "message" => "No local taxi service is currently available in your area."]);
+        exit;
+    }
 
     // ✅ Determine booking status
-    $booking_status = ($fromInMumbai && $toInMumbai) ? "Pending" : "Go back & Select One Way";
+    $booking_status = "Pending";
 
     $current_date = date('Y-m-d');
     $current_time = date('H:i:s');
@@ -204,7 +246,7 @@ try {
         
         try {
             require_once __DIR__ . '/send_new_booking_notification.php';
-            trigger_new_booking_notification($booking_id);
+            trigger_new_booking_notification($booking_id, $fromCoords['lat'], $fromCoords['lng']);
         } catch (Throwable $e) {
             error_log("FCM Notification error: " . $e->getMessage());
         }
