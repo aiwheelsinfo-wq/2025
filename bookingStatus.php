@@ -99,6 +99,11 @@ while ($row = $result->fetch_assoc()) {
                 $row['discount_percentage'] = $row_discount_percentage;
                 $row['discounted_price'] = $row_discounted_price;
                 $row['discount_name'] = $row_discount_name;
+            } else if ($row['trip_type'] === 'Local-taxi') {
+                // Local Taxi has no discount in trip status
+                $row['discount_percentage'] = 0;
+                $row['discounted_price'] = 0;
+                $row['discount_name'] = '';
             } else {
                 // non-One-way trip
                 $row['discount_percentage'] = $discount_percentage;

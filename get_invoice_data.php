@@ -127,25 +127,7 @@ if ($tableCheck && $tableCheck->num_rows > 0) {
     }
 }
 
-// Check new customer discount for Local-taxi if no discount found
-if ($tripType === 'Local-taxi' && floatval($data['discount_value']) == 0) {
-    $booker_id = $data['booker_id'];
-    $count_stmt = $conn->prepare("SELECT COUNT(*) AS booking_count FROM bookings WHERE booker_id = ?");
-    if ($count_stmt) {
-        $count_stmt->bind_param("s", $booker_id);
-        $count_stmt->execute();
-        $count_res = $count_stmt->get_result();
-        if ($count_res && $count_row = $count_res->fetch_assoc()) {
-            $booking_count = intval($count_row['booking_count']);
-            if ($booking_count <= 5) {
-                $data['discount_type'] = 'percentage';
-                $data['discount_value'] = 10.0;
-                $data['discount_name'] = 'Loyalty';
-            }
-        }
-        $count_stmt->close();
-    }
-}
+// No automatic new customer discount for Local-taxi
 
 if (!empty($data['time'])) {
     $data['time'] = date('h:i A', strtotime($data['time']));
