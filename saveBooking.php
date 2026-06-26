@@ -65,48 +65,59 @@ $response = array();
 
 
  
-$trip_type = $_POST['trip_type'];
-$car_type = $_POST['car_type'];
-$from_address = $_POST['from_address'];
-$to_address = $_POST['to_address'];
-$distance = $_POST['distance'];
-$date = date('Y-m-d', strtotime($_POST['date']));
-$tripTime = $_POST['tripTime']; 
-$tripTimeParsed = strtotime($tripTime);
+$trip_type = $_POST['trip_type'] ?? '';
+$car_type = $_POST['car_type'] ?? '';
+$from_address = $_POST['from_address'] ?? '';
+$to_address = $_POST['to_address'] ?? '';
+$distance = $_POST['distance'] ?? '';
+
+$date_input = $_POST['date'] ?? '';
+$date = !empty($date_input) ? date('Y-m-d', strtotime($date_input)) : '';
+
+$tripTime = $_POST['tripTime'] ?? ''; 
+$tripTimeParsed = !empty($tripTime) ? strtotime($tripTime) : false;
 if ($tripTimeParsed !== false) {
     $tripTime = date('H:i:s', $tripTimeParsed);
+} else {
+    $tripTime = '';
 }
-$return_date = date('Y-m-d', strtotime($_POST['return_date']));
-$return_time = $_POST['return_time']; 
-$returnTimeParsed = strtotime($return_time);
+
+$return_date_input = $_POST['return_date'] ?? '';
+$return_date = !empty($return_date_input) ? date('Y-m-d', strtotime($return_date_input)) : '1970-01-01';
+
+$return_time = $_POST['return_time'] ?? ''; 
+$returnTimeParsed = !empty($return_time) ? strtotime($return_time) : false;
 if ($returnTimeParsed !== false) {
     $return_time = date('H:i:s', $returnTimeParsed);
+} else {
+    $return_time = '';
 }
-$name = $_POST['name'];
-$email = $_POST['email'];
-$pincode = $_POST['pincode'];
-$city = $_POST['city'];
-$base_charge = $_POST['base_charge'];
-$driver_ta = $_POST['driver_ta'];
-$toll_charge = $_POST['toll_charge'];
-$total_amount = $_POST['total_amount'];
-$payment_type = $_POST['payment_type'];
-$userNumber = $_POST['userNumber'];
-$agent_commission = $_POST['agent_commission'];
-$booking_authority = (!empty($commission) && $commission > 0) ? 'agent' : 'customer';
-$agni_amount = $_POST['agni_amount'];
-$vendor_amount = $_POST['vendor_amount'];
-$user_type = $_POST['user_type'];
-$customer_mob = $_POST['customer_mob'];
-$gst =$_POST['gst'];
-$gst_number=$_POST['gst_number'];
-$business_name=$_POST['business_name'];
-$business_address=$_POST['business_address'];
-$business_pincode = $_POST['business_pincode'];
+
+$name = $_POST['name'] ?? '';
+$email = $_POST['email'] ?? '';
+$pincode = $_POST['pincode'] ?? '';
+$city = $_POST['city'] ?? '';
+$base_charge = $_POST['base_charge'] ?? '';
+$driver_ta = $_POST['driver_ta'] ?? '';
+$toll_charge = $_POST['toll_charge'] ?? '';
+$total_amount = $_POST['total_amount'] ?? '';
+$payment_type = $_POST['payment_type'] ?? '';
+$userNumber = $_POST['userNumber'] ?? '';
+$agent_commission = $_POST['agent_commission'] ?? '';
+$booking_authority = (!empty($agent_commission) && $agent_commission > 0) ? 'agent' : 'customer';
+$agni_amount = $_POST['agni_amount'] ?? '';
+$vendor_amount = $_POST['vendor_amount'] ?? '';
+$user_type = $_POST['user_type'] ?? '';
+$customer_mob = $_POST['customer_mob'] ?? '';
+$gst = $_POST['gst'] ?? '';
+$gst_number = $_POST['gst_number'] ?? '';
+$business_name = $_POST['business_name'] ?? '';
+$business_address = $_POST['business_address'] ?? '';
+$business_pincode = $_POST['business_pincode'] ?? '';
 $final_booking_id = null;
 date_default_timezone_set('Asia/Kolkata');
 $booked_at = date('Y-m-d H:i:s');
-$bookingId = $_POST['bookingId'];
+$bookingId = $_POST['bookingId'] ?? '';
 
 
 
