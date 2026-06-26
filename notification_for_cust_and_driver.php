@@ -9,7 +9,7 @@ use Google\Auth\Credentials\ServiceAccountCredentials;
 
 // 🔐 ACCESS TOKEN
 function getAccessToken() {
-    $keyFile = '/home/o96ayd7ennr5/public_html/2025/agni-car-app-firebase-adminsdk-fbsvc-4f70f7d1f2.json';
+    $keyFile = '/var/www/html/2025/agni-car-app-firebase-adminsdk-fbsvc-4f70f7d1f2.json';
     $scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
 
     $credentials = new ServiceAccountCredentials($scopes, $keyFile);

@@ -11,7 +11,7 @@ use Google\Auth\Credentials\ServiceAccountCredentials;
 // CONFIGURATION
 // =====================
 $projectId = 'agni-car-app';
-$googleAccountKeyFilePath = '/home/o96ayd7ennr5/public_html/2025/agni-car-app-firebase-adminsdk-fbsvc-4f70f7d1f2.json';
+$googleAccountKeyFilePath = '/var/www/html/2025/agni-car-app-firebase-adminsdk-fbsvc-4f70f7d1f2.json';
 
 // Your target FCM token
 $deviceToken = 'fhuWBakfS6ynqnWS80pP0x:APA91bEJqithx-OA-scIunwD1NKWMgewY6g6a1eRAygWvpXvY1goH_RxtJjVQ0dIPdYS4KRUGNQNKpdmPK8wVKztUI4ilIDM-FUh-BNB8vvncfNO3oWE-Cw';

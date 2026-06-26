@@ -27,7 +27,7 @@ while ($row = mysqli_fetch_assoc($result)) {
 // Function to get a service account access token.
 function getAccessToken() {
     // Path to your service account JSON key file. **IMPORTANT: Keep this file secure!**
-    $googleAccountKeyFilePath = '/home/o96ayd7ennr5/public_html/2025/agni-car-app-firebase-adminsdk-fbsvc-4f70f7d1f2.json';
+    $googleAccountKeyFilePath = '/var/www/html/2025/agni-car-app-firebase-adminsdk-fbsvc-4f70f7d1f2.json';
 
     // Define the required scopes for Firebase messaging
     $scopes = ['https://www.googleapis.com/auth/firebase.messaging'];

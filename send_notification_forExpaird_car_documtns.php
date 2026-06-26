@@ -15,7 +15,7 @@ $projectId = 'agni-car-app';
 
 // Get Firebase access token
 function getAccessToken() {
-    $googleAccountKeyFilePath = '/home/o96ayd7ennr5/public_html/2025/agni-car-app-firebase-adminsdk-fbsvc-4f70f7d1f2.json';
+    $googleAccountKeyFilePath = '/var/www/html/2025/agni-car-app-firebase-adminsdk-fbsvc-4f70f7d1f2.json';
     $scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
     $credentials = new ServiceAccountCredentials($scopes, $googleAccountKeyFilePath);
     $accessToken = $credentials->fetchAuthToken();
