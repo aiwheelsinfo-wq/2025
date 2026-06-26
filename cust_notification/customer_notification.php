@@ -26,10 +26,14 @@ function getAccessToken() {
     }
 
     // ✅ Load service account
-    $serviceAccount = json_decode(file_get_contents(__DIR__ . "/google-services.json"), true);
+    $serviceAccountPath = dirname(__DIR__) . "/agni-car-app-firebase-adminsdk-fbsvc-4f70f7d1f2.json";
+    if (!file_exists($serviceAccountPath)) {
+        $serviceAccountPath = __DIR__ . "/google-services.json"; // fallback
+    }
+    $serviceAccount = json_decode(file_get_contents($serviceAccountPath), true);
 
     if (!$serviceAccount) {
-        die("Invalid service-account.json");
+        die("Invalid Firebase credentials file.");
     }
 
     $header = base64UrlEncode(json_encode([
