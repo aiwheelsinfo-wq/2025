@@ -288,7 +288,7 @@ $projectId = 'agni-car-app';
 // Fetch the fcm_token of the booking agent (booker)
 $fcm_bookerToken = 'd14kUzAvRSiSGgFXgKr0ki:APA91bGnbj1b1aeMifNmY-l58bcvO1xluXIG_dSS1f4Ra7sN02IMfuU3HW032-JQu56PZHVn_7PUwO7l2DComSbXYP9f2o8epGDM0pV5ic8R3xRrUFkORe0';
 
-
+$bookerTokenResult = null;
 if ($bookerTokenResult && mysqli_num_rows($bookerTokenResult) > 0) {
     $bookerRow = mysqli_fetch_assoc($bookerTokenResult);
     $fcm_bookerToken = $bookerRow['fcm_token'];
