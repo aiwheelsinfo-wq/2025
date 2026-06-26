@@ -1,6 +1,10 @@
 <?php
 header("Content-Type: application/json");
 
+// Disable error displaying and ignore deprecations/notices to prevent JSON corruption
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE);
+ini_set('display_errors', 0);
+
 // Set PHP timezone
 date_default_timezone_set('Asia/Kolkata');
 
