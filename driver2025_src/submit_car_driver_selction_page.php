@@ -43,6 +43,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         WHERE date BETWEEN DATE_SUB(?, INTERVAL 2 DAY) AND DATE_ADD(?, INTERVAL 2 DAY)
         AND id != ?
         AND booking_status != 'Completed'
+        AND booking_status != 'Cancelled'
+        AND booking_status != 'Customer Cancelled'
         AND (driver_id = ? OR vehicle_id = ?)
     ";
 
