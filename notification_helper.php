@@ -1,6 +1,6 @@
 <?php
 // ==========================================
-// notification_helper.php — Agni Car Rental Alerts (WhatsApp & Email)
+// notification_helper.php — Agni Car Rental Alerts (WhatsApp, Email & SMS)
 // ==========================================
 
 define('ULTRAMSG_INSTANCE', 'instance182608');
@@ -120,7 +120,49 @@ if (!function_exists('sendEmailAlert')) {
 }
 
 /**
- * Send booking placement notification (WhatsApp & Email) to customer
+ * Send Transactional SMS via Fast2SMS Dev API
+ */
+if (!function_exists('sendSMSAlert')) {
+    function sendSMSAlert($to, $message) {
+        $formatted_phone = preg_replace('/[^0-9]/', '', $to);
+        if (strlen($formatted_phone) > 10) {
+            $formatted_phone = substr($formatted_phone, -10);
+        }
+        if (strlen($formatted_phone) !== 10) {
+            return false;
+        }
+
+        $apiKey = 'p9J1ofaxrnDXePcsUTdlRu630Vg7KQiWMC24OEmjwFSByh8AH5R5n6sSBzCuvQATbf2g87hV9mtqd0GD';
+        $url = "https://www.fast2sms.com/dev/api/SendSMS";
+        
+        $payload = [
+            'sender_id' => 'FSTSMS',
+            'message' => $message,
+            'language' => 'english',
+            'route' => 'p', // promotional route fallback to bypass DLT template restrictions
+            'numbers' => $formatted_phone,
+            'flash' => 0
+        ];
+
+        $headers = [
+            'Authorization: Bearer ' . $apiKey
+        ];
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($payload));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        $res = curl_exec($ch);
+        curl_close($ch);
+        return $res;
+    }
+}
+
+/**
+ * Send booking placement notification (WhatsApp, Email & SMS) to customer
  */
 if (!function_exists('sendBookingWhatsAppNotification')) {
     function sendBookingWhatsAppNotification($booking_id, $conn) {
@@ -225,12 +267,21 @@ if (!function_exists('sendBookingWhatsAppNotification')) {
         </div>
         ';
 
-        // Trigger both (wrapped in try-catch to keep it robust)
+        // SMS Message (concise)
+        $sms_message = "Booking Received! ID: #{$booking_id}. Trip: {$trip_type}. Pickup: " . substr($from, 0, 30) . "... on {$date} at {$time}. Thanks for booking with Agni Car Rental!";
+
+        // Trigger notifications
         $wa_res = false;
         try {
             $wa_res = sendWhatsAppMessage($mobile, $wa_message);
         } catch (Throwable $e) {
             error_log("WhatsApp Booking Send error: " . $e->getMessage());
+        }
+
+        try {
+            sendSMSAlert($mobile, $sms_message);
+        } catch (Throwable $e) {
+            error_log("SMS Booking Send error: " . $e->getMessage());
         }
 
         if (!empty($email)) {
@@ -246,7 +297,7 @@ if (!function_exists('sendBookingWhatsAppNotification')) {
 }
 
 /**
- * Send driver assignment/confirmation notification (WhatsApp & Email) to customer
+ * Send driver assignment/confirmation notification (WhatsApp, Email & SMS) to customer
  */
 if (!function_exists('sendAcceptWhatsAppNotification')) {
     function sendAcceptWhatsAppNotification($booking_id, $conn) {
@@ -384,12 +435,21 @@ if (!function_exists('sendAcceptWhatsAppNotification')) {
         </div>
         ';
 
-        // Trigger both
+        // SMS Message
+        $sms_message = "Driver assigned for Booking #{$booking_id}! Driver: {$driver_name} ({$driver_phone}), Vehicle: {$vehicle_id}. Have a safe journey! - Agni Car Rental";
+
+        // Trigger notifications
         $wa_res = false;
         try {
             $wa_res = sendWhatsAppMessage($mobile, $wa_message);
         } catch (Throwable $e) {
             error_log("WhatsApp Accept Send error: " . $e->getMessage());
+        }
+
+        try {
+            sendSMSAlert($mobile, $sms_message);
+        } catch (Throwable $e) {
+            error_log("SMS Accept Send error: " . $e->getMessage());
         }
 
         if (!empty($email)) {
@@ -405,7 +465,7 @@ if (!function_exists('sendAcceptWhatsAppNotification')) {
 }
 
 /**
- * Send driver cancellation notification (WhatsApp & Email) to customer
+ * Send driver cancellation notification (WhatsApp, Email & SMS) to customer
  */
 if (!function_exists('sendCancelWhatsAppNotification')) {
     function sendCancelWhatsAppNotification($booking_id, $conn) {
@@ -467,12 +527,21 @@ if (!function_exists('sendCancelWhatsAppNotification')) {
         </div>
         ';
 
-        // Trigger both
+        // SMS Message
+        $sms_message = "Trip Alert: Your driver cancelled booking #{$booking_id}. We are assigning another driver immediately and will update you shortly. - Agni Car Rental";
+
+        // Trigger notifications
         $wa_res = false;
         try {
             $wa_res = sendWhatsAppMessage($mobile, $wa_message);
         } catch (Throwable $e) {
             error_log("WhatsApp Cancel Send error: " . $e->getMessage());
+        }
+
+        try {
+            sendSMSAlert($mobile, $sms_message);
+        } catch (Throwable $e) {
+            error_log("SMS Cancel Send error: " . $e->getMessage());
         }
 
         if (!empty($email)) {
