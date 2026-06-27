@@ -14,6 +14,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $vehicle_id = isset($data['vehicle_id']) ? mysqli_real_escape_string($conn, $data['vehicle_id']) : NULL;
     $booking_id = isset($data['booking_id']) ? mysqli_real_escape_string($conn, $data['booking_id']) : '';
     $vender_id = isset($data['vender_id']) ? mysqli_real_escape_string($conn, $data['vender_id']) : '';
+    $email = isset($data['email']) ? mysqli_real_escape_string($conn, $data['email']) : '';
 
     if (empty($booking_id)) {
         echo json_encode(["success" => false, "message" => "Invalid booking ID"]);
@@ -84,16 +85,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $stmt->bind_param("sssi", $driver_id, $vehicle_id, $vender_id, $booking_id);
 
     if ($stmt->execute()) {
-        // Send WhatsApp confirmation notification to customer
+        // Send WhatsApp and Email confirmation notification to customer
         try {
             if (file_exists(__DIR__ . '/../notification_helper.php')) {
                 require_once __DIR__ . '/../notification_helper.php';
             } else {
                 require_once __DIR__ . '/../2025/notification_helper.php';
             }
+            
+            // 1. Send WhatsApp
             sendAcceptWhatsAppNotification($booking_id, $conn);
+            
+            // 2. Send Email (if provided)
+            if (!empty($email)) {
+                sendAcceptEmailNotification($booking_id, $email, $conn);
+            }
         } catch (Throwable $e) {
-            error_log("WhatsApp Accept Notification error: " . $e->getMessage());
+            error_log("WhatsApp/Email Accept Notification error: " . $e->getMessage());
         }
 
         echo json_encode([
