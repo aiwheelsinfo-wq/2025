@@ -26,6 +26,9 @@ if (!$conn) {
     exit;
 }
 
+// Set MySQL connection charset to utf8mb4
+mysqli_set_charset($conn, "utf8mb4");
+
 // Set MySQL timezone
 if (!mysqli_query($conn, "SET time_zone = '+05:30'")) {
     echo json_encode([
