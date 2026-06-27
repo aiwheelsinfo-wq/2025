@@ -173,4 +173,48 @@ if (!function_exists('sendAcceptWhatsAppNotification')) {
         return sendWhatsAppMessage($mobile, $message);
     }
 }
+
+/**
+ * Send driver cancellation notification to customer
+ */
+if (!function_exists('sendCancelWhatsAppNotification')) {
+    function sendCancelWhatsAppNotification($booking_id, $conn) {
+        $stmt = $conn->prepare("SELECT mobile FROM bookings WHERE id = ?");
+        if (!$stmt) return false;
+        $stmt->bind_param("i", $booking_id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        if ($res->num_rows === 0) {
+            $stmt->close();
+            return false;
+        }
+        $booking = $res->fetch_assoc();
+        $stmt->close();
+
+        $mobile = $booking['mobile'];
+
+        // Fetch user name
+        $name = "Customer";
+        $user_stmt = $conn->prepare("SELECT name FROM users WHERE phone_number = ? LIMIT 1");
+        if ($user_stmt) {
+            $user_stmt->bind_param("s", $mobile);
+            $user_stmt->execute();
+            $user_res = $user_stmt->get_result();
+            if ($user_res->num_rows > 0) {
+                $user = $user_res->fetch_assoc();
+                if (!empty($user['name'])) {
+                    $name = $user['name'];
+                }
+            }
+            $user_stmt->close();
+        }
+
+        $message = "*Trip Update* 🚖\n\n" .
+                   "Dear *{$name}*,\n" .
+                   "We regret to inform you that your assigned driver has cancelled the trip for booking *#{$booking_id}*.\n\n" .
+                   "⚠️ *Do not worry:* We are currently assigning another professional driver/vehicle to your booking immediately. We will update you with new details shortly. Thank you for your patience!";
+
+        return sendWhatsAppMessage($mobile, $message);
+    }
+}
 ?>
