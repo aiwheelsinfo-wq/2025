@@ -133,26 +133,26 @@ if (!function_exists('sendSMSAlert')) {
         }
 
         $apiKey = 'p9J1ofaxrnDXePcsUTdlRu630Vg7KQiWMC24OEmjwFSByh8AH5R5n6sSBzCuvQATbf2g87hV9mtqd0GD';
-        $url = "https://www.fast2sms.com/dev/api/SendSMS";
+        $url = 'https://www.fast2sms.com/dev/bulkV2';
         
         $payload = [
-            'sender_id' => 'FSTSMS',
+            'route' => 'q',
             'message' => $message,
             'language' => 'english',
-            'route' => 'p', // promotional route fallback to bypass DLT template restrictions
-            'numbers' => $formatted_phone,
-            'flash' => 0
+            'flash' => 0,
+            'numbers' => $formatted_phone
         ];
 
         $headers = [
-            'Authorization: Bearer ' . $apiKey
+            'authorization: ' . $apiKey,
+            'Content-Type: application/json'
         ];
 
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($payload));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
         curl_setopt($ch, CURLOPT_TIMEOUT, 10);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         $res = curl_exec($ch);
