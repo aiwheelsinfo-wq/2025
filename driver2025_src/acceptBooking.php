@@ -112,7 +112,11 @@ try {
         
         // Send WhatsApp confirmation notification to customer
         try {
-            require_once __DIR__ . '/../notification_helper.php';
+            if (file_exists(__DIR__ . '/../notification_helper.php')) {
+                require_once __DIR__ . '/../notification_helper.php';
+            } else {
+                require_once __DIR__ . '/../2025/notification_helper.php';
+            }
             sendAcceptWhatsAppNotification($booking_id, $conn);
         } catch (Throwable $e) {
             error_log("WhatsApp Accept Notification error: " . $e->getMessage());
