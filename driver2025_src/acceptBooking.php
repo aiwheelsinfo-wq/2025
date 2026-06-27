@@ -109,6 +109,15 @@ try {
     
     if ($updateStmt->execute()) {
         $conn->commit();
+        
+        // Send WhatsApp confirmation notification to customer
+        try {
+            require_once __DIR__ . '/../notification_helper.php';
+            sendAcceptWhatsAppNotification($booking_id, $conn);
+        } catch (Throwable $e) {
+            error_log("WhatsApp Accept Notification error: " . $e->getMessage());
+        }
+
         echo json_encode(["success" => true, "message" => "Booking accepted successfully"]);
     } else {
         $conn->rollback();

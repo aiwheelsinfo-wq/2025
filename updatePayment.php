@@ -65,6 +65,14 @@ if (mysqli_query($conn, $sql)) {
             require_once __DIR__ . '/send_new_booking_notification.php';
             trigger_new_booking_notification($booking_id);
 
+            // Send WhatsApp notification to the customer
+            try {
+                require_once __DIR__ . '/notification_helper.php';
+                sendBookingWhatsAppNotification($booking_id, $conn);
+            } catch (Throwable $e) {
+                error_log("WhatsApp Booking Notification error: " . $e->getMessage());
+            }
+
             // Notify booker (admin/agent)
             $fcm_bookerToken = 'd14kUzAvRSiSGgFXgKr0ki:APA91bGnbj1b1aeMifNmY-l58bcvO1xluXIG_dSS1f4Ra7sN02IMfuU3HW032-JQu56PZHVn_7PUwO7l2DComSbXYP9f2o8epGDM0pV5ic8R3xRrUFkORe0';
             

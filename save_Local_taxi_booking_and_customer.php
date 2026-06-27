@@ -251,6 +251,14 @@ try {
             error_log("FCM Notification error: " . $e->getMessage());
         }
 
+        // Send WhatsApp notification to the customer
+        try {
+            require_once __DIR__ . '/notification_helper.php';
+            sendBookingWhatsAppNotification($booking_id, $conn);
+        } catch (Throwable $e) {
+            error_log("WhatsApp Booking Notification error: " . $e->getMessage());
+        }
+
         echo json_encode([
             "status" => "success",
             "message" => "Booking and customer data saved successfully",
