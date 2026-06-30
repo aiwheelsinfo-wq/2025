@@ -44,9 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['numbers']) && isset($_G
     curl_close($ch);
 
     // 2. Send the WhatsApp notification via UltraMsg
-    $whatsappMessage = "Your OTP for Agni Car Rental is: $otp. Please do not share it with anyone.";
+    $whatsappMessage = "Your OTP for Rentox  Car Rental is: $otp. Please do not share it with anyone.";
     try {
-        sendWhatsAppMessage($phoneNumber, $whatsappMessage);
+        $wa_res = sendWhatsAppMessage($phoneNumber, $whatsappMessage);
+        error_log("WhatsApp OTP Send result for $phoneNumber: " . $wa_res);
     } catch (Throwable $e) {
         error_log("WhatsApp OTP Send error: " . $e->getMessage());
     }
@@ -103,9 +104,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_POST['phone_number'])) {
     curl_close($ch);
 
     // 2. Send the WhatsApp notification via UltraMsg
-    $whatsappMessage = "Your OTP for Agni Car Rental is: $otp. Please do not share it with anyone.";
+    $whatsappMessage = "Your OTP for Rentox  Car Rental is: $otp. Please do not share it with anyone.";
     try {
-        sendWhatsAppMessage($phoneNumber, $whatsappMessage);
+        $wa_res = sendWhatsAppMessage($phoneNumber, $whatsappMessage);
+        error_log("WhatsApp OTP Send result for $phoneNumber: " . $wa_res);
     } catch (Throwable $e) {
         error_log("WhatsApp OTP Send error: " . $e->getMessage());
     }
