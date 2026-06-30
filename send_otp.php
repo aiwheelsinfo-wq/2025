@@ -4,7 +4,6 @@ header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 header("Content-Type: application/json");
 
-include('db_connect.php');
 require_once(__DIR__ . '/notification_helper.php');
 
 // Determine if we are handling a GET request from the mobile apps (re-routing Fast2SMS)
@@ -52,18 +51,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['numbers']) && isset($_G
         error_log("WhatsApp OTP Send error: " . $e->getMessage());
     }
 
-    // 3. Save OTP in the database for tracking/auditing
-    $otp_sent_time = date('Y-m-d H:i:s');
-    $query = "INSERT INTO users (phone_number, otp, otp_sent_time) 
-              VALUES (?, ?, ?) 
-              ON DUPLICATE KEY UPDATE otp = ?, otp_sent_time = ?";
-    $stmt = $conn->prepare($query);
-    if ($stmt) {
-        $stmt->bind_param("sssss", $phoneNumber, $otp, $otp_sent_time, $otp, $otp_sent_time);
-        $stmt->execute();
-        $stmt->close();
-    }
-
     // Return the Fast2SMS response so the mobile apps parse it successfully
     if ($smsHttpCode === 200 && $smsResponse) {
         echo $smsResponse;
@@ -75,7 +62,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && isset($_GET['numbers']) && isset($_G
             "sms_error" => $smsResponse
         ]);
     }
-    mysqli_close($conn);
     exit;
 }
 
@@ -124,26 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' || isset($_POST['phone_number'])) {
         error_log("WhatsApp OTP Send error: " . $e->getMessage());
     }
 
-    // 3. Save the phone number and OTP in the database
-    $otp_sent_time = date('Y-m-d H:i:s');
-    $query = "INSERT INTO users (phone_number, otp, otp_sent_time) 
-              VALUES (?, ?, ?) 
-              ON DUPLICATE KEY UPDATE otp = ?, otp_sent_time = ?";
-    $stmt = $conn->prepare($query);
-    if ($stmt) {
-        $stmt->bind_param("sssss", $phoneNumber, $otp, $otp_sent_time, $otp, $otp_sent_time);
-        $result = $stmt->execute();
-        if ($result) {
-            echo json_encode(["return" => true, "message" => "OTP sent successfully"]);
-        } else {
-            echo json_encode(["return" => false, "message" => "Error: " . $stmt->error]);
-        }
-        $stmt->close();
-    } else {
-        echo json_encode(["return" => false, "message" => "Error: " . $conn->error]);
-    }
-
-    mysqli_close($conn);
+    echo json_encode(["return" => true, "message" => "OTP sent successfully"]);
     exit;
 }
 
