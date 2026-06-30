@@ -278,11 +278,14 @@ if (!function_exists('sendBookingWhatsAppNotification')) {
             error_log("WhatsApp Booking Send error: " . $e->getMessage());
         }
 
+        // sendSMSAlert SMS notification removed as requested
+        /*
         try {
             sendSMSAlert($mobile, $sms_message);
         } catch (Throwable $e) {
             error_log("SMS Booking Send error: " . $e->getMessage());
         }
+        */
 
         if (!empty($email)) {
             try {
@@ -446,11 +449,14 @@ if (!function_exists('sendAcceptWhatsAppNotification')) {
             error_log("WhatsApp Accept Send error: " . $e->getMessage());
         }
 
+        // sendSMSAlert SMS notification removed as requested
+        /*
         try {
             sendSMSAlert($mobile, $sms_message);
         } catch (Throwable $e) {
             error_log("SMS Accept Send error: " . $e->getMessage());
         }
+        */
 
         if (!empty($email)) {
             try {
@@ -538,11 +544,14 @@ if (!function_exists('sendCancelWhatsAppNotification')) {
             error_log("WhatsApp Cancel Send error: " . $e->getMessage());
         }
 
+        // sendSMSAlert SMS notification removed as requested
+        /*
         try {
             sendSMSAlert($mobile, $sms_message);
         } catch (Throwable $e) {
             error_log("SMS Cancel Send error: " . $e->getMessage());
         }
+        */
 
         if (!empty($email)) {
             try {
