@@ -1,11 +1,23 @@
 <?php
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header('Content-Type: application/json');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 file_put_contents("log.txt", print_r($_POST, true));
-include 'db_connect.php';
+
+if (file_exists('db_connect.php')) {
+    include 'db_connect.php';
+} else if (file_exists('../db_connect.php')) {
+    include '../db_connect.php';
+}
 
 $action = $_POST['action'] ?? '';
 
@@ -118,7 +130,7 @@ else if ($action === 'get_booking_otp') {
     t.gstPercent
     FROM 
     bookings AS b 
-    JOIN tripCostTable AS t 
+    LEFT JOIN tripCostTable AS t 
     ON t.tripType = b.trip_type 
     AND t.carType = b.car_type 
     AND t.minLat IS NULL
