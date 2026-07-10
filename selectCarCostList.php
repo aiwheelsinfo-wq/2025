@@ -10,13 +10,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 include 'db_connect.php';
 
-// Discount percentage
-$discount_percentage = 10;
-$discount_type = 'percentage';
-$discount_value = 10;
-
 // Get parameters
 $tripType  = $_GET['tripType'] ?? '';
+
+// Discount percentage
+$discount_percentage = ($tripType === 'Local-Duty') ? 0 : 10;
+$discount_type = 'percentage';
+$discount_value = ($tripType === 'Local-Duty') ? 0 : 10;
 
 if ($tripType === 'One-way') {
     $discount_percentage = 0;
