@@ -209,7 +209,7 @@ if (!function_exists('sendBookingWhatsAppNotification')) {
         // WhatsApp message
         $wa_message = "*Booking Received!* 🚗\n\n" .
                       "Dear *{$name}*,\n" .
-                      "Thank you for booking with *Agni Car Rental*! We have received your trip request.\n\n" .
+                      "Thank you for booking with *Rentox Car Rental*! We have received your trip request.\n\n" .
                       "📍 *Booking Details:*\n" .
                       "• *Booking ID:* #{$booking_id}\n" .
                       "• *Trip Type:* {$trip_type}\n" .
@@ -227,7 +227,7 @@ if (!function_exists('sendBookingWhatsAppNotification')) {
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 25px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff; color: #1f2937;">
             <h2 style="color: #FFB300; margin-top: 0; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">Booking Received! 🚗</h2>
             <p style="font-size: 15px; line-height: 1.5;">Dear ' . htmlspecialchars($name) . ',</p>
-            <p style="font-size: 15px; line-height: 1.5;">Thank you for booking with <strong>Agni Car Rental</strong>! We have received your trip request. Here are your booking details:</p>
+            <p style="font-size: 15px; line-height: 1.5;">Thank you for booking with <strong>Rentox Car Rental</strong>! We have received your trip request. Here are your booking details:</p>
             
             <h3 style="color: #374151; margin-top: 20px; font-size: 16px;">📍 Booking Details:</h3>
             <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px;">
@@ -263,12 +263,12 @@ if (!function_exists('sendBookingWhatsAppNotification')) {
 
             <p style="font-size: 15px; line-height: 1.5; margin-top: 25px;">We are currently assigning the nearest professional driver to your ride and will send you confirmation details shortly.</p>
             <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-            <p style="font-size: 12px; color: #9ca3af; text-align: center;">&copy; 2026 Agni Car Rental. All rights reserved.</p>
+            <p style="font-size: 12px; color: #9ca3af; text-align: center;">&copy; 2026 Rentox Car Rental. All rights reserved.</p>
         </div>
         ';
 
         // SMS Message (concise)
-        $sms_message = "Booking Received! ID: #{$booking_id}. Trip: {$trip_type}. Pickup: " . substr($from, 0, 30) . "... on {$date} at {$time}. Thanks for booking with Agni Car Rental!";
+        $sms_message = "Booking Received! ID: #{$booking_id}. Trip: {$trip_type}. Pickup: " . substr($from, 0, 30) . "... on {$date} at {$time}. Thanks for booking with Rentox Car Rental!";
 
         // Trigger notifications
         $wa_res = false;
@@ -365,7 +365,7 @@ if (!function_exists('sendAcceptWhatsAppNotification')) {
         // WhatsApp message
         $wa_message = "*Booking Confirmed!* 🎉\n\n" .
                       "Dear *{$name}*,\n" .
-                      "Your booking *#{$booking_id}* with *Agni Car Rental* is officially confirmed!\n\n" .
+                      "Your booking *#{$booking_id}* with *Rentox Car Rental* is officially confirmed!\n\n" .
                       "📍 *Trip Details:*\n" .
                       "• *Trip Type:* {$trip_type}\n" .
                       "• *Pickup:* {$from}\n";
@@ -386,7 +386,7 @@ if (!function_exists('sendAcceptWhatsAppNotification')) {
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 25px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff; color: #1f2937;">
             <h2 style="color: #FFB300; margin-top: 0; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">Booking Confirmed! 🎉</h2>
             <p style="font-size: 15px; line-height: 1.5;">Dear ' . htmlspecialchars($name) . ',</p>
-            <p style="font-size: 15px; line-height: 1.5;">Your booking <strong>#' . $booking_id . '</strong> with <strong>Agni Car Rental</strong> is officially confirmed! Here are the details of your upcoming trip:</p>
+            <p style="font-size: 15px; line-height: 1.5;">Your booking <strong>#' . $booking_id . '</strong> with <strong>Rentox Car Rental</strong> is officially confirmed! Here are the details of your upcoming trip:</p>
             
             <h3 style="color: #374151; margin-top: 20px; font-size: 16px;">📍 Trip Information:</h3>
             <table style="width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px;">
@@ -434,12 +434,12 @@ if (!function_exists('sendAcceptWhatsAppNotification')) {
             
             <p style="font-size: 15px; line-height: 1.5; margin-top: 25px;">The driver will reach your location on time. Please contact them if needed. Have a safe and happy journey! 🙏</p>
             <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-            <p style="font-size: 12px; color: #9ca3af; text-align: center;">&copy; 2026 Agni Car Rental. All rights reserved.</p>
+            <p style="font-size: 12px; color: #9ca3af; text-align: center;">&copy; 2026 Rentox Car Rental. All rights reserved.</p>
         </div>
         ';
 
         // SMS Message
-        $sms_message = "Driver assigned for Booking #{$booking_id}! Driver: {$driver_name} ({$driver_phone}), Vehicle: {$vehicle_id}. Have a safe journey! - Agni Car Rental";
+        $sms_message = "Driver assigned for Booking #{$booking_id}! Driver: {$driver_name} ({$driver_phone}), Vehicle: {$vehicle_id}. Have a safe journey! - Rentox Car Rental";
 
         // Trigger notifications
         $wa_res = false;
@@ -529,12 +529,12 @@ if (!function_exists('sendCancelWhatsAppNotification')) {
             
             <p style="font-size: 14px; color: #6b7280; text-align: center; margin-top: 25px;">Thank you for your patience and cooperation.</p>
             <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-            <p style="font-size: 12px; color: #9ca3af; text-align: center;">&copy; 2026 Agni Car Rental. All rights reserved.</p>
+            <p style="font-size: 12px; color: #9ca3af; text-align: center;">&copy; 2026 Rentox Car Rental. All rights reserved.</p>
         </div>
         ';
 
         // SMS Message
-        $sms_message = "Trip Alert: Your driver cancelled booking #{$booking_id}. We are assigning another driver immediately and will update you shortly. - Agni Car Rental";
+        $sms_message = "Trip Alert: Your driver cancelled booking #{$booking_id}. We are assigning another driver immediately and will update you shortly. - Rentox Car Rental";
 
         // Trigger notifications
         $wa_res = false;
