@@ -26,7 +26,10 @@ $stmt = $conn->prepare("
         trip_type,
         vendor_amount,
         base_charge,
-        driver_ta
+        driver_ta,
+        from_address,
+        to_address,
+        return_date
     FROM bookings
     WHERE vender_id = ?
       AND (
@@ -83,7 +86,11 @@ while ($row = $result->fetch_assoc()) {
         "transaction_reference" => $row['transaction_reference'],
         "expected_settlement_date" => $expected_settlement_date,
         "trip_type" => $trip_type,
-        "vendor_amount" => floatval($row['vendor_amount'])
+        "vendor_amount" => floatval($row['vendor_amount']),
+        "from_address" => $row['from_address'] ?? '',
+        "to_address" => $row['to_address'] ?? '',
+        "starting_date" => $row['date'] ?? '',
+        "return_date" => $row['return_date'] ?? ''
     ];
 }
 
