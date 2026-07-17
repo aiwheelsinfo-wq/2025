@@ -28,7 +28,7 @@ $conn->begin_transaction();
 
 try {
     // Select booking with FOR UPDATE to lock the row
-    $stmt = $conn->prepare("SELECT booking_status, date FROM bookings WHERE id = ? FOR UPDATE");
+    $stmt = $conn->prepare("SELECT booking_status, date, trip_type, from_address FROM bookings WHERE id = ? FOR UPDATE");
     $stmt->bind_param("i", $booking_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -42,11 +42,77 @@ try {
     $booking = $result->fetch_assoc();
     $status = $booking['booking_status'];
     $selectedBookingDate = $booking['date'];
+    $trip_type = $booking['trip_type'] ?? '';
+    $from_address = $booking['from_address'] ?? '';
     
     if ($status !== 'Pending') {
         $conn->rollback();
         echo json_encode(["success" => false, "message" => "This booking has already been accepted by another vendor."]);
         exit;
+    }
+
+    // Check for 5 km radius limit on Local-taxi bookings
+    if (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false) {
+        // 1. Get driver's location
+        $driver_lat = null;
+        $driver_lng = null;
+        $driver_stmt = $conn->prepare("SELECT latitude, longitude FROM drivers WHERE phone_number = ? LIMIT 1");
+        if ($driver_stmt) {
+            $driver_stmt->bind_param("s", $driver_id);
+            $driver_stmt->execute();
+            $driver_res = $driver_stmt->get_result();
+            if ($driver_res->num_rows > 0) {
+                $driver_row = $driver_res->fetch_assoc();
+                $driver_lat = !empty($driver_row['latitude']) ? floatval($driver_row['latitude']) : null;
+                $driver_lng = !empty($driver_row['longitude']) ? floatval($driver_row['longitude']) : null;
+            }
+            $driver_stmt->close();
+        }
+
+        if ($driver_lat === null || $driver_lng === null || $driver_lat == 0 || $driver_lng == 0) {
+            $conn->rollback();
+            echo json_encode(["success" => false, "message" => "Could not verify your location. Please ensure your GPS/location tracking is active in the app."]);
+            exit;
+        }
+
+        // 2. Geocode the booking's pickup address
+        $pickup_lat = null;
+        $pickup_lng = null;
+        $googleMapsApiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM';
+        $geocodeUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=" . urlencode($from_address) . "&key=$googleMapsApiKey";
+        try {
+            $geoResponse = file_get_contents($geocodeUrl);
+            if ($geoResponse) {
+                $geoData = json_decode($geoResponse, true);
+                if ($geoData['status'] === 'OK') {
+                    $pickup_lat = $geoData['results'][0]['geometry']['location']['lat'];
+                    $pickup_lng = $geoData['results'][0]['geometry']['location']['lng'];
+                }
+            }
+        } catch (Throwable $e) {
+            error_log("Geocoding failed during booking accept: " . $e->getMessage());
+        }
+
+        if ($pickup_lat !== null && $pickup_lng !== null) {
+            if (!function_exists('getDistance')) {
+                function getDistance($lat1, $lon1, $lat2, $lon2) {
+                    $earth_radius = 6371; // Earth radius in km
+                    $dLat = deg2rad($lat2 - $lat1);
+                    $dLon = deg2rad($lon2 - $lon1);
+                    $a = sin($dLat / 2) * sin($dLat / 2) +
+                         cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+                         sin($dLon / 2) * sin($dLon / 2);
+                    $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+                    return $earth_radius * $c; // Distance in km
+                }
+            }
+            $distance = getDistance($pickup_lat, $pickup_lng, $driver_lat, $driver_lng);
+            if ($distance > 5.0) {
+                $conn->rollback();
+                echo json_encode(["success" => false, "message" => "You are too far from the pickup location (" . round($distance, 2) . " km). You must be within 5 km to accept this booking."]);
+                exit;
+            }
+        }
     }
 
     // Check for driver or vehicle conflict within past 2 and next 2 days relative to selected booking date

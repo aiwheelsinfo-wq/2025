@@ -107,7 +107,7 @@ try {
     $vendors_res = $conn->query($vendors_sql);
     
     $vendor_found = false;
-    $radius_km = 20;
+    $radius_km = 5;
 
     if ($vendors_res && $vendors_res->num_rows > 0) {
         while ($row = $vendors_res->fetch_assoc()) {
