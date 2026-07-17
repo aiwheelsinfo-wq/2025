@@ -229,6 +229,7 @@ try {
                     continue; // Skip this booking because it's outside the driver's radius
                 }
             }
+        }
 
         $bookings[] = [
             "booking_id" => $booking_id,
