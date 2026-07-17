@@ -6,9 +6,26 @@ $vendor_phone = $_POST['phone_number'] ?? null;
 $driver_phone = $_POST['phone_number'] ?? null;
 $currentDate = date('Y-m-d');
 
+// Fetch driver's current coordinates for radius filtering
 try {
     if (!$conn) {
         throw new Exception("Database connection failed.");
+    }
+
+    $driver_lat = null;
+    $driver_lon = null;
+    if (!empty($driver_phone)) {
+        $drvStmt = $conn->prepare("SELECT latitude, longitude FROM drivers WHERE phone_number = ? LIMIT 1");
+        if ($drvStmt) {
+            $drvStmt->bind_param("s", $driver_phone);
+            $drvStmt->execute();
+            $drvStmt->bind_result($dLat, $dLon);
+            if ($drvStmt->fetch()) {
+                $driver_lat = !empty($dLat) ? floatval($dLat) : null;
+                $driver_lon = !empty($dLon) ? floatval($dLon) : null;
+            }
+            $drvStmt->close();
+        }
     }
 
     // ===================== Fetch Accepted Bookings =====================
@@ -166,7 +183,54 @@ try {
     );
 
     $bookings = [];
+    $googleMapsApiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM';
+    
+    if (!function_exists('getDistance')) {
+        function getDistance($lat1, $lon1, $lat2, $lon2) {
+            $earth_radius = 6371; // Earth radius in km
+            $dLat = deg2rad($lat2 - $lat1);
+            $dLon = deg2rad($lon2 - $lon1);
+            $a = sin($dLat / 2) * sin($dLat / 2) +
+                 cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
+                 sin($dLon / 2) * sin($dLon / 2);
+            $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+            return $earth_radius * $c; // Distance in km
+        }
+    }
+
     while ($stmtPending->fetch()) {
+        $radius_km = 20;
+        if (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false) {
+            $radius_km = 5;
+        }
+
+        // Apply distance filter if driver location is available
+        if ($driver_lat !== null && $driver_lon !== null && $driver_lat != 0 && $driver_lon != 0) {
+            // Geocode the booking's pickup address
+            $pickup_lat = null;
+            $pickup_lng = null;
+            $geocodeUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=" . urlencode($from_address) . "&key=$googleMapsApiKey";
+            try {
+                $geoResponse = @file_get_contents($geocodeUrl);
+                if ($geoResponse) {
+                    $geoData = json_decode($geoResponse, true);
+                    if ($geoData['status'] === 'OK') {
+                        $pickup_lat = $geoData['results'][0]['geometry']['location']['lat'];
+                        $pickup_lng = $geoData['results'][0]['geometry']['location']['lng'];
+                    }
+                }
+            } catch (Throwable $e) {
+                error_log("Geocoding failed in getBookings: " . $e->getMessage());
+            }
+
+            if ($pickup_lat !== null && $pickup_lng !== null) {
+                $dist = getDistance($pickup_lat, $pickup_lng, $driver_lat, $driver_lon);
+                if ($dist > $radius_km) {
+                    continue; // Skip this booking because it's outside the driver's radius
+                }
+            }
+        }
+
         $bookings[] = [
             "booking_id" => $booking_id,
             "car_type" => $car_type,
