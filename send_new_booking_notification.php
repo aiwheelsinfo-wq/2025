@@ -130,7 +130,11 @@ function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon
     
     $tokens = [];
     $radius_km = 20;
-    if (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false) {
+    if (stripos($trip_type, 'Local-taxi') !== false) {
+        $radius_km = 5;
+    } elseif (stripos($trip_type, 'Local-duty') !== false) {
+        $radius_km = 10;
+    } elseif (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false) {
         $radius_km = 5;
     }
     while ($row = mysqli_fetch_assoc($vendors_res)) {

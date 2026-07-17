@@ -106,10 +106,16 @@ try {
                     return $earth_radius * $c; // Distance in km
                 }
             }
+            $allowed_radius = 5.0;
+            if (stripos($trip_type, 'Local-duty') !== false) {
+                $allowed_radius = 10.0;
+            } elseif (stripos($trip_type, 'Local-taxi') !== false) {
+                $allowed_radius = 5.0;
+            }
             $distance = getDistance($pickup_lat, $pickup_lng, $driver_lat, $driver_lng);
-            if ($distance > 5.0) {
+            if ($distance > $allowed_radius) {
                 $conn->rollback();
-                echo json_encode(["success" => false, "message" => "You are too far from the pickup location (" . round($distance, 2) . " km). You must be within 5 km to accept this booking."]);
+                echo json_encode(["success" => false, "message" => "You are too far from the pickup location (" . round($distance, 2) . " km). You must be within " . $allowed_radius . " km to accept this booking."]);
                 exit;
             }
         }
