@@ -225,10 +225,15 @@ try {
 
             if ($pickup_lat !== null && $pickup_lng !== null) {
                 $dist = getDistance($pickup_lat, $pickup_lng, $driver_lat, $driver_lon);
+                file_put_contents('log.txt', "Phone: $driver_phone | Driver Lat: $driver_lat, Lon: $driver_lon | Booking Address: $from_address | Geocoded: $pickup_lat, $pickup_lng | Dist: $dist | Radius: $radius_km\n", FILE_APPEND);
                 if ($dist > $radius_km) {
                     continue; // Skip this booking because it's outside the driver's radius
                 }
+            } else {
+                file_put_contents('log.txt', "Geocoding failed for: $from_address\n", FILE_APPEND);
             }
+        } else {
+            file_put_contents('log.txt', "Driver location not set or zero: Phone: $driver_phone | lat: $driver_lat | lon: $driver_lon\n", FILE_APPEND);
         }
 
         $bookings[] = [
