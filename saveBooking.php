@@ -66,6 +66,33 @@ $response = array();
 
  
 $trip_type = $_POST['trip_type'] ?? '';
+
+if (stripos($trip_type, 'Local-duty') !== false) {
+    $vendors_sql = "SELECT latitude, longitude FROM drivers WHERE status = 'active' AND (userType = 'vendor' OR userType = '' OR userType IS NULL)";
+    $vendors_res = mysqli_query($conn, $vendors_sql);
+    
+    $vendor_found = false;
+    $local_duty_radius = 10.0;
+
+    if ($vendors_res && mysqli_num_rows($vendors_res) > 0) {
+        while ($row = mysqli_fetch_assoc($vendors_res)) {
+            // Ignore unset (empty or 0.0) coordinates since we cannot verify their actual distance
+            if (!empty($row['latitude']) && !empty($row['longitude']) && floatval($row['latitude']) != 0 && floatval($row['longitude']) != 0) {
+                $dist = getDistance($ref_lat, $ref_lon, floatval($row['latitude']), floatval($row['longitude']));
+                if ($dist <= $local_duty_radius) {
+                    $vendor_found = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!$vendor_found) {
+        echo json_encode(["success" => false, "message" => "No local duty service is currently available in your area."]);
+        exit;
+    }
+}
+
 $car_type = $_POST['car_type'] ?? '';
 $from_address = $_POST['from_address'] ?? '';
 $to_address = $_POST['to_address'] ?? '';
