@@ -111,11 +111,8 @@ try {
 
     if ($vendors_res && $vendors_res->num_rows > 0) {
         while ($row = $vendors_res->fetch_assoc()) {
-            // If vendor coordinates are unset (empty or 0.0), treat them as available globally (as fallback)
-            if (empty($row['latitude']) || empty($row['longitude']) || floatval($row['latitude']) == 0 || floatval($row['longitude']) == 0) {
-                $vendor_found = true;
-                break;
-            } else {
+            // Ignore unset (empty or 0.0) coordinates since we cannot verify their actual distance
+            if (!empty($row['latitude']) && !empty($row['longitude']) && floatval($row['latitude']) != 0 && floatval($row['longitude']) != 0) {
                 $dist = getDistance($fromCoords['lat'], $fromCoords['lng'], floatval($row['latitude']), floatval($row['longitude']));
                 if ($dist <= $radius_km) {
                     $vendor_found = true;
