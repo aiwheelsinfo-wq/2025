@@ -102,12 +102,12 @@ try {
         exit;
     }
 
-    // Check if there is any active vendor/driver within 25 km
+    // Check if there is any active vendor/driver within 5 km
     $vendors_sql = "SELECT latitude, longitude FROM drivers WHERE status = 'active'";
     $vendors_res = $conn->query($vendors_sql);
     
     $vendor_found = false;
-    $radius_km = 25;
+    $radius_km = 5;
 
     if ($vendors_res && $vendors_res->num_rows > 0) {
         while ($row = $vendors_res->fetch_assoc()) {
