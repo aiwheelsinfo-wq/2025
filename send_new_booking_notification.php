@@ -120,8 +120,8 @@ function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon
     }
     
     // 2. Fetch active vendors/drivers with FCM tokens, latitude, and longitude
-    // Includes userType='vendor' AND empty userType (some vendors register without userType set)
-    $vendors_sql = "SELECT fcm_token, latitude, longitude FROM drivers WHERE status = 'active' AND (userType = 'vendor' OR userType = '' OR userType IS NULL) AND fcm_token IS NOT NULL AND fcm_token != ''";
+    // Includes userType='vendor', userType='driver', AND empty userType
+    $vendors_sql = "SELECT fcm_token, latitude, longitude FROM drivers WHERE status = 'active' AND (userType = 'vendor' OR userType = 'driver' OR userType = '' OR userType IS NULL) AND fcm_token IS NOT NULL AND fcm_token != ''";
     $vendors_res = mysqli_query($conn, $vendors_sql);
     if (!$vendors_res) {
         error_log("Notification DB Error fetching vendors: " . mysqli_error($conn));
