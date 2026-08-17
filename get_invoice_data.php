@@ -108,6 +108,9 @@ if ($finalCostRow) {
     $data['daily_limit']       = $finalCostRow['daily_limit'];
     $data['driverRate']       = $finalCostRow['driverRate'];
     $data['agni_share']       = $finalCostRow['agni_share'];
+    if (!isset($data['agent_commission']) || empty($data['agent_commission'])) {
+        $data['agent_commission'] = $finalCostRow['agni_share'] ?? 0;
+    }
 }
 // Step 5: Fetch active discount for this trip type
 $data['discount_type'] = null;
