@@ -42,8 +42,8 @@ try {
             b.return_date,
             b.return_time,
             CASE 
-                WHEN b.trip_type = 'Local-taxi' THEN b.total_amount - 100 
-                ELSE b.total_amount 
+                WHEN b.trip_type = 'Local-taxi' THEN (b.total_amount - COALESCE(b.agent_commission, 0) - 100)
+                ELSE (b.total_amount - COALESCE(b.agent_commission, 0))
             END AS total_amount,
             b.mobile, 
             b.driver_id,
@@ -131,8 +131,8 @@ try {
             b.date, 
             b.time, 
             CASE 
-                WHEN b.trip_type = 'Local-taxi' THEN b.total_amount - 100 
-                ELSE b.total_amount 
+                WHEN b.trip_type = 'Local-taxi' THEN (b.total_amount - COALESCE(b.agent_commission, 0) - 100)
+                ELSE (b.total_amount - COALESCE(b.agent_commission, 0))
             END AS total_amount,
             b.mobile, 
             b.trip_type, 
