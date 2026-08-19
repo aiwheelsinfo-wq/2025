@@ -104,12 +104,28 @@ if ($finalCostRow) {
     $data['packageKm']        = $finalCostRow['packageKm'];
     $data['packageHours']     = $finalCostRow['packageHours'];
     $data['gstPercent']       = $finalCostRow['gstPercent'];
-    $data['driver_allowance']  = $finalCostRow['driver_allowance'];
+    $data['driver_allowance']  = ($tripType === 'Round-Trip') ? 300 : $finalCostRow['driver_allowance'];
     $data['daily_limit']       = $finalCostRow['daily_limit'];
     $data['driverRate']       = $finalCostRow['driverRate'];
     $data['agni_share']       = $finalCostRow['agni_share'];
     if (!isset($data['agent_commission']) || empty($data['agent_commission'])) {
         $data['agent_commission'] = $finalCostRow['agni_share'] ?? 0;
+    }
+}
+
+if ($tripType === 'Round-Trip') {
+    if (isset($data['driver_ta']) && floatval($data['driver_ta']) > 0) {
+        $rDays = 1;
+        if (!empty($data['date']) && !empty($data['return_date'])) {
+            $d1 = strtotime($data['date']);
+            $d2 = strtotime($data['return_date']);
+            if ($d2 >= $d1) {
+                $rDays = round(($d2 - $d1) / 86400) + 1;
+            }
+        }
+        $data['driver_allowance'] = floatval($data['driver_ta']) / $rDays;
+    } else {
+        $data['driver_allowance'] = 300;
     }
 }
 // Step 5: Fetch active discount for this trip type
