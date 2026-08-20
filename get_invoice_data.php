@@ -18,9 +18,9 @@ if (empty($bookingId)) {
 }
 
 // Step 1: Get booking + user details
-$query = "SELECT bookings.*, users.* 
+$query = "SELECT bookings.*, users.name, users.email, users.agency_name, users.city, users.pincode, users.accountType 
           FROM bookings 
-          JOIN users ON bookings.mobile = users.phone_number 
+          LEFT JOIN users ON bookings.mobile = users.phone_number 
           WHERE bookings.id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("s", $bookingId);
@@ -33,6 +33,49 @@ if ($result->num_rows === 0) {
 }
 
 $data = $result->fetch_assoc();
+
+// If booked by an agent, get agent agency & contact info
+if (!empty($data['booker_id'])) {
+    $agent_stmt = $conn->prepare("SELECT agency_name, name AS agent_name, email AS agent_email, city AS agent_city, pincode AS agent_pincode, phone_number AS agent_phone, accountType AS agent_accountType FROM users WHERE phone_number = ?");
+    if ($agent_stmt) {
+        $agent_stmt->bind_param("s", $data['booker_id']);
+        $agent_stmt->execute();
+        $agent_res = $agent_stmt->get_result();
+        if ($agent_res && $agent_row = $agent_res->fetch_assoc()) {
+            $data['agent_agency_name'] = $agent_row['agency_name'];
+            $data['agent_name']        = $agent_row['agent_name'];
+            $data['agent_email']       = $agent_row['agent_email'];
+            $data['agent_city']        = $agent_row['agent_city'];
+            $data['agent_pincode']     = $agent_row['agent_pincode'];
+            $data['agent_phone']       = $agent_row['agent_phone'];
+            $data['agent_accountType'] = $agent_row['agent_accountType'];
+        }
+        $agent_stmt->close();
+    }
+}
+
+// Step 1.5: Get driver details if assigned
+$data['driver_name'] = '';
+$data['driver_phone'] = '';
+$data['vehicle_number'] = $data['vehicle_id'] ?? '';
+
+if (!empty($data['driver_id'])) {
+    $driver_stmt = $conn->prepare("SELECT full_name, phone_number, rc_no FROM drivers WHERE phone_number = ? OR driver_id = ? LIMIT 1");
+    if ($driver_stmt) {
+        $driver_stmt->bind_param("ss", $data['driver_id'], $data['driver_id']);
+        $driver_stmt->execute();
+        $driver_res = $driver_stmt->get_result();
+        if ($driver_res && $driver_row = $driver_res->fetch_assoc()) {
+            $data['driver_name'] = $driver_row['full_name'] ?? '';
+            $data['driver_phone'] = $driver_row['phone_number'] ?? '';
+            if (empty($data['vehicle_number']) && !empty($driver_row['rc_no'])) {
+                $data['vehicle_number'] = $driver_row['rc_no'];
+            }
+        }
+        $driver_stmt->close();
+    }
+}
+
 $tripType = $data['trip_type'];
 $carType = $data['car_type'];
 $toAddress = urlencode($data['to_address']);
@@ -104,28 +147,12 @@ if ($finalCostRow) {
     $data['packageKm']        = $finalCostRow['packageKm'];
     $data['packageHours']     = $finalCostRow['packageHours'];
     $data['gstPercent']       = $finalCostRow['gstPercent'];
-    $data['driver_allowance']  = ($tripType === 'Round-Trip') ? 300 : $finalCostRow['driver_allowance'];
+    $data['driver_allowance']  = $finalCostRow['driver_allowance'];
     $data['daily_limit']       = $finalCostRow['daily_limit'];
     $data['driverRate']       = $finalCostRow['driverRate'];
     $data['agni_share']       = $finalCostRow['agni_share'];
     if (!isset($data['agent_commission']) || empty($data['agent_commission'])) {
         $data['agent_commission'] = $finalCostRow['agni_share'] ?? 0;
-    }
-}
-
-if ($tripType === 'Round-Trip') {
-    if (isset($data['driver_ta']) && floatval($data['driver_ta']) > 0) {
-        $rDays = 1;
-        if (!empty($data['date']) && !empty($data['return_date'])) {
-            $d1 = strtotime($data['date']);
-            $d2 = strtotime($data['return_date']);
-            if ($d2 >= $d1) {
-                $rDays = round(($d2 - $d1) / 86400) + 1;
-            }
-        }
-        $data['driver_allowance'] = floatval($data['driver_ta']) / $rDays;
-    } else {
-        $data['driver_allowance'] = 300;
     }
 }
 // Step 5: Fetch active discount for this trip type
