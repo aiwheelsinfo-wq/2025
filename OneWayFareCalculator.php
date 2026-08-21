@@ -23,10 +23,14 @@ class OneWayFareCalculator {
         $carType,
         float $distanceKm,
         string $pickupAddress = '',
-        string $dropAddress = ''
+        string $dropAddress = '',
+        array $settingsOverride = []
     ): array {
         // 1. Fetch Global Settings (Cached)
         $global = self::getGlobalSettings($conn);
+        if (!empty($settingsOverride)) {
+            $global = array_merge($global, $settingsOverride);
+        }
 
         // 2. Fetch Vehicle Rule (Cached)
         $vehRule = self::getVehicleRule($conn, $carType);
