@@ -3,19 +3,21 @@
 require_once __DIR__ . '/FareCache.php';
 
 /**
- * Isolated One-Way Dynamic Fare Calculation Engine (v2)
+ * Isolated One-Way Dynamic Fare Calculation Engine (v2.1)
+ * Incorporates Supply-Demand Elasticity, Outlier Protection, and Hard Boundary Guarantees.
  * All monetary calculations performed in integer paise to eliminate floating-point drift.
  */
 class OneWayFareCalculator {
 
     /**
-     * Main calculation endpoint
+     * Main calculation endpoint for One-Way trips
      *
      * @param mysqli $conn
      * @param int|string $carType Either category ID (int) or category name (e.g. 'Sedan', 'SUV')
      * @param float $distanceKm
      * @param string $pickupAddress
      * @param string $dropAddress
+     * @param array $settingsOverride
      * @return array
      */
     public static function calculate(
@@ -34,16 +36,24 @@ class OneWayFareCalculator {
 
         // 2. Fetch Vehicle Rule (Cached)
         $vehRule = self::getVehicleRule($conn, $carType);
+        if (!empty($settingsOverride['vehicle_rule_override'])) {
+            $vehRule = array_merge($vehRule, $settingsOverride['vehicle_rule_override']);
+        }
 
         // 3. Distance Normalization
         $minDist = (float)($vehRule['min_distance_km'] ?? 100.0);
         $chargeableKm = max($distanceKm, $minDist);
         $kmRate = (float)($vehRule['km_rate'] ?? 13.0);
 
-        // Base KM Charge (in integer paise)
-        $baseKmChargeP = self::toPaise($chargeableKm * $kmRate);
+        // Raw Base KM Charge (in integer paise)
+        $rawBaseKmCharge = $chargeableKm * $kmRate;
 
-        // 4. Driver Allowance (with switch check)
+        // 4. One-Way Dynamic Pricing Calculation (if active)
+        $dynamicMetrics = self::calculateOneWayDynamicDemand($conn, $global, $vehRule, $rawBaseKmCharge, $settingsOverride);
+        $effectiveBaseKmCharge = $dynamicMetrics['final_one_way_rate'] > 0 ? $dynamicMetrics['final_one_way_rate'] : $rawBaseKmCharge;
+        $baseKmChargeP = self::toPaise($effectiveBaseKmCharge);
+
+        // 5. Driver Allowance (with switch check)
         $allowanceP = 0;
         $allowanceShort = (float)($vehRule['driver_allowance_short'] ?? 300.0);
         $allowanceLong = (float)($vehRule['driver_allowance_long'] ?? 400.0);
@@ -55,14 +65,14 @@ class OneWayFareCalculator {
                 : self::toPaise($allowanceLong);
         }
 
-        // 5. Toll Estimate (with switch check)
+        // 6. Toll Estimate (with switch check)
         $tollP = 0;
         $tollRate = (float)($global['toll_per_km_rate'] ?? 2.25);
         if (!empty($global['toll_auto_estimate'])) {
             $tollP = self::toPaise($chargeableKm * $tollRate);
         }
 
-        // 6. Parking Surcharge (with switch check)
+        // 7. Parking Surcharge (with switch check)
         $parkingP = 0;
         $defaultParking = (float)($global['default_parking_amount'] ?? 0.0);
         if (!empty($global['parking_active'])) {
@@ -72,7 +82,7 @@ class OneWayFareCalculator {
         // Subtotal (Base KM + Allowance + Toll + Parking)
         $subtotalP = $baseKmChargeP + $allowanceP + $tollP + $parkingP;
 
-        // 7. Tax / GST Calculation (Flat or Split by Route)
+        // 8. Tax / GST Calculation (Flat or Split by Route)
         $gstP = 0;
         $gstMode = $global['gst_mode'] ?? 'flat';
         $gstPercent = (float)($global['gst_percent'] ?? 5.0);
@@ -81,7 +91,7 @@ class OneWayFareCalculator {
         $igstPercent = (float)($global['igst_percent'] ?? 5.0);
 
         $gstBreakdown = [
-            'is_active' => (bool)$global['gst_active'],
+            'is_active' => (bool)($global['gst_active'] ?? true),
             'mode'      => $gstMode,
             'rate'      => $gstPercent,
             'cgst'      => 0.0,
@@ -116,7 +126,7 @@ class OneWayFareCalculator {
 
         $grossTotalP = $subtotalP + $gstP;
 
-        // 8. Discount Calculation (with switch check)
+        // 9. Discount Calculation (with switch check)
         $discountP = 0;
         $discType = $global['discount_type'] ?? 'percentage';
         $discVal = (float)($global['discount_value'] ?? 0.0);
@@ -142,19 +152,236 @@ class OneWayFareCalculator {
             'distance_km'             => $distanceKm,
             'chargeable_km'           => $chargeableKm,
             'km_rate'                 => $kmRate,
+            'raw_base_km_charge'      => round($rawBaseKmCharge, 2),
             'base_km_charge'          => self::fromPaise($baseKmChargeP),
+            'dynamic_pricing'         => $dynamicMetrics,
             'driver_allowance'        => self::fromPaise($allowanceP),
-            'driver_allowance_active' => (bool)$global['driver_allowance_active'],
+            'driver_allowance_active' => (bool)($global['driver_allowance_active'] ?? true),
             'toll_charge'             => self::fromPaise($tollP),
             'parking_charge'          => self::fromPaise($parkingP),
             'subtotal'                => self::fromPaise($subtotalP),
             'gst_amount'              => self::fromPaise($gstP),
             'gst_breakdown'           => $gstBreakdown,
             'discount_amount'         => self::fromPaise($discountP),
-            'discount_active'         => (bool)$global['discount_active'],
+            'discount_active'         => (bool)($global['discount_active'] ?? false),
             'final_fare'              => self::fromPaise($finalFareP),
             'final_fare_rounded'      => round(self::fromPaise($finalFareP)),
         ];
+    }
+
+    /**
+     * One-Way Dynamic Demand Engine
+     * Calculates Reference Demand, Today's Demand, Demand Ratio, Sensitivity Adjustment, and Bound Protection.
+     */
+    public static function calculateOneWayDynamicDemand(
+        mysqli $conn,
+        array $global,
+        array $vehRule,
+        float $baseRate,
+        array $overrides = []
+    ): array {
+        $isActive = !empty($global['dynamic_pricing_active']);
+        $sensitivity = isset($overrides['oneway_pricing_sensitivity']) 
+            ? (float)$overrides['oneway_pricing_sensitivity'] 
+            : (float)($global['oneway_pricing_sensitivity'] ?? 50.0);
+        $outlierThreshold = isset($overrides['outlier_threshold_pct'])
+            ? (float)$overrides['outlier_threshold_pct']
+            : (float)($global['outlier_threshold_pct'] ?? 50.0);
+
+        // 1. Reference Demand (from historical One-Way bookings only)
+        $refDemand = isset($overrides['simulated_reference_demand'])
+            ? (float)$overrides['simulated_reference_demand']
+            : self::getHistoricalOneWayReferenceDemand($conn, $global, $outlierThreshold);
+
+        // 2. Today's One-Way Demand
+        $todayDemand = isset($overrides['simulated_today_demand'])
+            ? (float)$overrides['simulated_today_demand']
+            : self::getTodaysOneWayDemand($conn);
+
+        // Fallbacks for safety
+        if ($refDemand <= 0) $refDemand = 1.0;
+        if ($todayDemand <= 0) $todayDemand = 1.0;
+
+        // 3. Demand Ratio & Demand Change %
+        $demandRatio = $todayDemand / $refDemand;
+        $demandChangePct = ($demandRatio - 1.0) * 100.0;
+
+        // 4. Price Adjustment % based on Sensitivity
+        $priceAdjustmentPct = $isActive ? ($demandChangePct * ($sensitivity / 100.0)) : 0.0;
+
+        // 5. Dynamic One-Way Rate
+        $dynamicRate = $baseRate * (1.0 + ($priceAdjustmentPct / 100.0));
+
+        // 6. Minimum / Maximum Boundary Protection
+        $minRateMulti = (float)($vehRule['min_rate_multiplier'] ?? 0.80);
+        $maxRateMulti = (float)($vehRule['max_rate_multiplier'] ?? 1.40);
+
+        $minRate = (float)($vehRule['min_rate'] ?? 0.0);
+        if ($minRate <= 0) {
+            $minRate = $baseRate * $minRateMulti;
+        }
+
+        $maxRate = (float)($vehRule['max_rate'] ?? 0.0);
+        if ($maxRate <= 0) {
+            $maxRate = $baseRate * $maxRateMulti;
+        }
+
+        // Apply Protection Bounds
+        $finalRate = $isActive 
+            ? max($minRate, min($maxRate, $dynamicRate))
+            : $baseRate;
+
+        // 7. Plain-English Explainability text
+        $explanation = self::generateExplainabilityText(
+            $todayDemand, $refDemand, $demandChangePct, $sensitivity, $priceAdjustmentPct, $baseRate, $finalRate, $isActive
+        );
+
+        return [
+            'is_active'            => $isActive,
+            'reference_demand'     => round($refDemand, 4),
+            'today_demand'         => round($todayDemand, 4),
+            'demand_ratio'         => round($demandRatio, 4),
+            'demand_change_pct'    => round($demandChangePct, 2),
+            'pricing_sensitivity'  => round($sensitivity, 2),
+            'price_adjustment_pct' => round($priceAdjustmentPct, 2),
+            'base_one_way_rate'    => round($baseRate, 2),
+            'dynamic_one_way_rate' => round($dynamicRate, 2),
+            'min_one_way_rate'     => round($minRate, 2),
+            'max_one_way_rate'     => round($maxRate, 2),
+            'final_one_way_rate'   => round($finalRate, 2),
+            'is_floor_capped'      => ($finalRate <= $minRate + 0.01 && $dynamicRate < $minRate),
+            'is_ceiling_capped'    => ($finalRate >= $maxRate - 0.01 && $dynamicRate > $maxRate),
+            'explanation_text'     => $explanation,
+        ];
+    }
+
+    /**
+     * Calculates Historical Reference Demand using Median-based Outlier Filtering.
+     * Uses ONLY One-Way bookings (trip_type = 'One-way').
+     */
+    public static function getHistoricalOneWayReferenceDemand(mysqli $conn, array $global, float $outlierThreshold): float {
+        $cacheKey = 'oneway_ref_demand_' . round($outlierThreshold);
+        $cached = FareCache::get($cacheKey);
+        if ($cached !== null && is_numeric($cached)) {
+            return (float)$cached;
+        }
+
+        $lookbackDays = (int)($global['historical_lookback_days'] ?? 14);
+        if ($lookbackDays <= 0) $lookbackDays = 14;
+
+        // Query historical One-Way bookings grouped by date
+        $query = "SELECT 
+                    DATE(`date`) as b_date, 
+                    COUNT(*) as booking_count 
+                  FROM `bookings` 
+                  WHERE LOWER(`trip_type`) LIKE '%one-way%' 
+                    AND `date` >= DATE_SUB(CURDATE(), INTERVAL $lookbackDays DAY)
+                    AND `date` < CURDATE()
+                  GROUP BY DATE(`date`)";
+
+        $res = mysqli_query($conn, $query);
+        $demandHistory = [];
+
+        // Count total active vehicles as baseline supply denominator
+        $activeDriversRes = mysqli_query($conn, "SELECT COUNT(*) as total FROM `drivers` WHERE `status` = 'approved' OR `status` = 'active'");
+        $totalVehicles = ($activeDriversRes && $dRow = mysqli_fetch_assoc($activeDriversRes)) ? max(5, (int)$dRow['total']) : 12;
+
+        if ($res && mysqli_num_rows($res) > 0) {
+            while ($row = mysqli_fetch_assoc($res)) {
+                $bCount = (int)$row['booking_count'];
+                $demandHistory[] = round($bCount / $totalVehicles, 4);
+            }
+        }
+
+        // If not enough data, use healthy reference baseline
+        if (count($demandHistory) < 3) {
+            $fallback = 1.0000;
+            FareCache::set($cacheKey, $fallback, 3600);
+            return $fallback;
+        }
+
+        // Calculate Median
+        $median = self::calculateMedian($demandHistory);
+
+        // Filter Outliers: keep only demands within median ± threshold%
+        $lowerBound = $median * (1.0 - ($outlierThreshold / 100.0));
+        $upperBound = $median * (1.0 + ($outlierThreshold / 100.0));
+
+        $filteredDemands = array_filter($demandHistory, function ($val) use ($lowerBound, $upperBound) {
+            return $val >= $lowerBound && $val <= $upperBound;
+        });
+
+        if (empty($filteredDemands)) {
+            $filteredDemands = $demandHistory;
+        }
+
+        $refDemand = array_sum($filteredDemands) / count($filteredDemands);
+        $refDemand = round(max(0.2, min(5.0, $refDemand)), 4);
+
+        FareCache::set($cacheKey, $refDemand, 3600);
+        return $refDemand;
+    }
+
+    /**
+     * Calculates Today's One-Way Demand ratio: (Today's One-Way Bookings / Available Vehicles)
+     */
+    public static function getTodaysOneWayDemand(mysqli $conn): float {
+        $todayRes = mysqli_query($conn, "SELECT COUNT(*) as today_count FROM `bookings` WHERE LOWER(`trip_type`) LIKE '%one-way%' AND `date` = CURDATE()");
+        $todayBookings = ($todayRes && $bRow = mysqli_fetch_assoc($todayRes)) ? (int)$bRow['today_count'] : 0;
+
+        $activeDriversRes = mysqli_query($conn, "SELECT COUNT(*) as total FROM `drivers` WHERE `status` = 'approved' OR `status` = 'active'");
+        $availableVehicles = ($activeDriversRes && $dRow = mysqli_fetch_assoc($activeDriversRes)) ? max(5, (int)$dRow['total']) : 12;
+
+        // If no bookings yet today, assume baseline supply-demand ratio
+        if ($todayBookings <= 0) {
+            return 1.0000;
+        }
+
+        return round($todayBookings / $availableVehicles, 4);
+    }
+
+    /**
+     * Calculates Median of an array of numbers
+     */
+    public static function calculateMedian(array $numbers): float {
+        if (empty($numbers)) return 1.0;
+        sort($numbers, SORT_NUMERIC);
+        $count = count($numbers);
+        $mid = (int)floor($count / 2);
+
+        if ($count % 2 === 0) {
+            return ($numbers[$mid - 1] + $numbers[$mid]) / 2.0;
+        }
+        return (float)$numbers[$mid];
+    }
+
+    /**
+     * Generates a clear, plain-English explanation of why the price changed
+     */
+    private static function generateExplainabilityText(
+        float $todayDemand,
+        float $refDemand,
+        float $demandChangePct,
+        float $sensitivity,
+        float $priceAdjustmentPct,
+        float $baseRate,
+        float $finalRate,
+        bool $isActive
+    ): string {
+        if (!$isActive) {
+            return "Dynamic pricing is currently inactive. Standard Base One-Way Rate applied.";
+        }
+
+        $direction = $demandChangePct >= 0 ? "higher" : "lower";
+        $sign = $priceAdjustmentPct >= 0 ? "+" : "";
+        $absChange = abs(round($demandChangePct, 2));
+        $formattedAdj = $sign . round($priceAdjustmentPct, 2) . "%";
+
+        if (abs($demandChangePct) < 0.5) {
+            return "Today's One-Way demand is at normal historical baseline level ($todayDemand vs $refDemand ref). Base One-Way rate ₹" . number_format($baseRate, 2) . " applied.";
+        }
+
+        return "Today's One-Way demand is {$absChange}% {$direction} than the historical reference demand ({$todayDemand} vs {$refDemand}). With {$sensitivity}% pricing sensitivity, the One-Way rate was adjusted by {$formattedAdj} (Base Rate: ₹" . number_format($baseRate, 2) . " → Final Rate: ₹" . number_format($finalRate, 2) . ").";
     }
 
     /**
@@ -250,7 +477,7 @@ class OneWayFareCalculator {
      */
     public static function isIntraStateRoute(string $fromAddress, string $toAddress): bool {
         if (empty($fromAddress) || empty($toAddress)) {
-            return true; // Default to intra-state if addresses unavailable
+            return true;
         }
 
         $fromState = self::extractState($fromAddress);
@@ -280,23 +507,27 @@ class OneWayFareCalculator {
 
     private static function defaultGlobalSettings(): array {
         return [
-            'id'                     => 1,
-            'master_engine_active'   => 1,
-            'driver_allowance_active'=> 1,
-            'discount_active'        => 0,
-            'discount_type'          => 'percentage',
-            'discount_value'         => 10.0,
-            'gst_active'             => 1,
-            'gst_mode'               => 'split',
-            'gst_percent'            => 5.0,
-            'cgst_percent'           => 2.5,
-            'sgst_percent'           => 2.5,
-            'igst_percent'           => 5.0,
-            'parking_active'         => 0,
-            'default_parking_amount' => 0.0,
-            'toll_auto_estimate'     => 1,
-            'toll_per_km_rate'       => 2.25,
-            'row_version'            => 1
+            'id'                         => 1,
+            'master_engine_active'       => 1,
+            'driver_allowance_active'    => 1,
+            'discount_active'            => 0,
+            'discount_type'              => 'percentage',
+            'discount_value'             => 10.0,
+            'gst_active'                 => 1,
+            'gst_mode'                   => 'split',
+            'gst_percent'                => 5.0,
+            'cgst_percent'               => 2.5,
+            'sgst_percent'               => 2.5,
+            'igst_percent'               => 5.0,
+            'parking_active'             => 0,
+            'default_parking_amount'     => 0.0,
+            'toll_auto_estimate'         => 1,
+            'toll_per_km_rate'           => 2.25,
+            'dynamic_pricing_active'     => 1,
+            'oneway_pricing_sensitivity' => 50.0,
+            'outlier_threshold_pct'      => 50.0,
+            'historical_lookback_days'   => 14,
+            'row_version'                => 1
         ];
     }
 
@@ -309,6 +540,10 @@ class OneWayFareCalculator {
             'driver_allowance_short' => 300.0,
             'driver_allowance_long'  => 400.0,
             'distance_threshold_km'  => 200.0,
+            'min_rate'               => 0.0,
+            'max_rate'               => 0.0,
+            'min_rate_multiplier'    => 0.80,
+            'max_rate_multiplier'    => 1.40,
             'is_active'              => 1,
             'row_version'            => 1
         ];
