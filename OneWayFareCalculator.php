@@ -223,23 +223,28 @@ class OneWayFareCalculator {
             ? (float)$overrides['outlier_threshold_pct']
             : (float)($global['outlier_threshold_pct'] ?? 50.0);
 
-        // 1. Reference Demand (from historical One-Way bookings only)
+        // 1. Reference Demand (from historical One-Way bookings volume)
         $refDemand = isset($overrides['simulated_reference_demand'])
             ? (float)$overrides['simulated_reference_demand']
             : self::getHistoricalOneWayReferenceDemand($conn, $global, $outlierThreshold);
 
-        // 2. Today's One-Way Demand
+        // 2. Today's One-Way Demand (today's booking volume)
         $todayDemand = isset($overrides['simulated_today_demand'])
             ? (float)$overrides['simulated_today_demand']
             : self::getTodaysOneWayDemand($conn);
 
         // Fallbacks for safety
         if ($refDemand <= 0) $refDemand = 1.0;
-        if ($todayDemand <= 0) $todayDemand = 1.0;
 
         // 3. Demand Ratio & Demand Change %
-        $demandRatio = $todayDemand / $refDemand;
-        $demandChangePct = ($demandRatio - 1.0) * 100.0;
+        if ($todayDemand <= 0 && !isset($overrides['simulated_today_demand'])) {
+            // If no bookings placed yet today, default to standard baseline (1.0 ratio)
+            $demandRatio = 1.0000;
+            $demandChangePct = 0.0;
+        } else {
+            $demandRatio = round($todayDemand / $refDemand, 4);
+            $demandChangePct = ($demandRatio - 1.0) * 100.0;
+        }
 
         // 4. Price Adjustment % based on Sensitivity
         $priceAdjustmentPct = $isActive ? ($demandChangePct * ($sensitivity / 100.0)) : 0.0;
@@ -248,54 +253,69 @@ class OneWayFareCalculator {
         $dynamicRate = $baseRate * (1.0 + ($priceAdjustmentPct / 100.0));
 
         // 6. Minimum / Maximum Boundary Protection
-        $minRateMulti = (float)($vehRule['min_rate_multiplier'] ?? 0.80);
-        $maxRateMulti = (float)($vehRule['max_rate_multiplier'] ?? 1.40);
-
         $minRate = (float)($vehRule['min_rate'] ?? 0.0);
-        if ($minRate <= 0) {
-            $minRate = $baseRate * $minRateMulti;
-        }
-
         $maxRate = (float)($vehRule['max_rate'] ?? 0.0);
+
+        if ($minRate <= 0) {
+            $minMultiplier = (float)($global['min_rate_multiplier'] ?? 0.80);
+            $minRate = $baseRate * $minMultiplier;
+        }
         if ($maxRate <= 0) {
-            $maxRate = $baseRate * $maxRateMulti;
+            $maxMultiplier = (float)($global['max_rate_multiplier'] ?? 1.40);
+            $maxRate = $baseRate * $maxMultiplier;
         }
 
-        // Apply Protection Bounds
-        $finalRate = $isActive 
-            ? max($minRate, min($maxRate, $dynamicRate))
-            : $baseRate;
+        $finalRate = $dynamicRate;
+        $isFloorCapped = false;
+        $isCeilingCapped = false;
 
-        // 7. Plain-English Explainability text
+        if ($isActive) {
+            if ($finalRate < $minRate) {
+                $finalRate = $minRate;
+                $isFloorCapped = true;
+            } elseif ($finalRate > $maxRate) {
+                $finalRate = $maxRate;
+                $isCeilingCapped = true;
+            }
+        } else {
+            $finalRate = $baseRate;
+        }
+
         $explanation = self::generateExplainabilityText(
-            $todayDemand, $refDemand, $demandChangePct, $sensitivity, $priceAdjustmentPct, $baseRate, $finalRate, $isActive
+            $todayDemand,
+            $refDemand,
+            $demandChangePct,
+            $sensitivity,
+            $priceAdjustmentPct,
+            $baseRate,
+            $finalRate,
+            $isActive
         );
 
         return [
             'is_active'            => $isActive,
-            'reference_demand'     => round($refDemand, 4),
-            'today_demand'         => round($todayDemand, 4),
-            'demand_ratio'         => round($demandRatio, 4),
-            'demand_change_pct'    => round($demandChangePct, 2),
-            'pricing_sensitivity'  => round($sensitivity, 2),
-            'price_adjustment_pct' => round($priceAdjustmentPct, 2),
-            'base_one_way_rate'    => round($baseRate, 2),
-            'dynamic_one_way_rate' => round($dynamicRate, 2),
-            'min_one_way_rate'     => round($minRate, 2),
-            'max_one_way_rate'     => round($maxRate, 2),
-            'final_one_way_rate'   => round($finalRate, 2),
-            'is_floor_capped'      => ($finalRate <= $minRate + 0.01 && $dynamicRate < $minRate),
-            'is_ceiling_capped'    => ($finalRate >= $maxRate - 0.01 && $dynamicRate > $maxRate),
-            'explanation_text'     => $explanation,
+            'reference_demand'     => $refDemand,
+            'today_demand'         => $todayDemand,
+            'demand_ratio'         => $demandRatio,
+            'demand_change_pct'    => round($demandChangePct, 1),
+            'pricing_sensitivity'  => $sensitivity,
+            'price_adjustment_pct' => round($priceAdjustmentPct, 1),
+            'base_one_way_rate'    => $baseRate,
+            'dynamic_one_way_rate' => $dynamicRate,
+            'min_one_way_rate'     => $minRate,
+            'max_one_way_rate'     => $maxRate,
+            'final_one_way_rate'   => $finalRate,
+            'is_floor_capped'      => $isFloorCapped,
+            'is_ceiling_capped'    => $isCeilingCapped,
+            'explanation_text'     => $explanation
         ];
     }
 
     /**
-     * Calculates Historical Reference Demand using Median-based Outlier Filtering.
-     * Uses ONLY One-Way bookings (trip_type = 'One-way').
+     * Calculates Reference Demand from historical One-Way bookings volume
      */
     public static function getHistoricalOneWayReferenceDemand(mysqli $conn, array $global, float $outlierThreshold): float {
-        $cacheKey = 'oneway_ref_demand_' . round($outlierThreshold);
+        $cacheKey = 'oneway_ref_demand_' . date('Ymd');
         $cached = FareCache::get($cacheKey);
         if ($cached !== null && is_numeric($cached)) {
             return (float)$cached;
@@ -317,20 +337,15 @@ class OneWayFareCalculator {
         $res = mysqli_query($conn, $query);
         $demandHistory = [];
 
-        // Count total active vehicles as baseline supply denominator
-        $activeDriversRes = mysqli_query($conn, "SELECT COUNT(*) as total FROM `drivers` WHERE `status` = 'approved' OR `status` = 'active'");
-        $totalVehicles = ($activeDriversRes && $dRow = mysqli_fetch_assoc($activeDriversRes)) ? max(5, (int)$dRow['total']) : 12;
-
         if ($res && mysqli_num_rows($res) > 0) {
             while ($row = mysqli_fetch_assoc($res)) {
-                $bCount = (int)$row['booking_count'];
-                $demandHistory[] = round($bCount / $totalVehicles, 4);
+                $demandHistory[] = (float)$row['booking_count'];
             }
         }
 
         // If not enough data, use healthy reference baseline
         if (count($demandHistory) < 3) {
-            $fallback = 1.0000;
+            $fallback = 10.0;
             FareCache::set($cacheKey, $fallback, 3600);
             return $fallback;
         }
@@ -351,27 +366,20 @@ class OneWayFareCalculator {
         }
 
         $refDemand = array_sum($filteredDemands) / count($filteredDemands);
-        $refDemand = round(max(0.2, min(5.0, $refDemand)), 4);
+        $refDemand = round(max(1.0, $refDemand), 2);
 
         FareCache::set($cacheKey, $refDemand, 3600);
         return $refDemand;
     }
 
     /**
-     * Calculates Today's One-Way Demand ratio: (Today's One-Way Bookings / Available Vehicles)
+     * Calculates Today's One-Way Demand volume
      */
     public static function getTodaysOneWayDemand(mysqli $conn): float {
         $todayRes = mysqli_query($conn, "SELECT COUNT(*) as today_count FROM `bookings` WHERE LOWER(`trip_type`) LIKE '%one-way%' AND `date` = CURDATE()");
         $todayBookings = ($todayRes && $bRow = mysqli_fetch_assoc($todayRes)) ? (int)$bRow['today_count'] : 0;
 
-        $activeDriversRes = mysqli_query($conn, "SELECT COUNT(*) as total FROM `drivers` WHERE `status` = 'approved' OR `status` = 'active'");
-        $availableVehicles = ($activeDriversRes && $dRow = mysqli_fetch_assoc($activeDriversRes)) ? max(5, (int)$dRow['total']) : 12;
-
-        if ($todayBookings <= 0) {
-            return 1.0000;
-        }
-
-        return round($todayBookings / $availableVehicles, 4);
+        return (float)$todayBookings;
     }
 
     /**
