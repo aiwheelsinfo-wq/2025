@@ -1,6 +1,6 @@
 <?php
 header("Content-Type: application/json");
-include '../2025/db_connect.php'; // Database connection
+require_once __DIR__ . '/../db_connect.php'; // Database connection
 
 $vendor_phone = $_POST['phone_number'] ?? null;
 $driver_phone = $_POST['phone_number'] ?? null;
@@ -58,7 +58,9 @@ try {
             u.name AS customer_name,
             b.vendor_amount,
             d.phone_number AS driver_phone,
-            b.starting_km
+            b.starting_km,
+            b.paid_amount,
+            b.payment_type
         FROM 
             bookings AS b
         LEFT JOIN 
@@ -86,7 +88,8 @@ try {
         $booking_id, $car_type, $from_address, $to_address, $distance, $date, $time,
         $return_date, $return_time, $total_amount, $customer_contact, $driver_id,
         $vehicle_id, $booking_status, $otp, $trip_type, $driver_name, $vendor_name,
-        $driver_lat, $driver_lon, $customer_name, $vendor_amount, $driver_phone, $starting_km
+        $driver_lat, $driver_lon, $customer_name, $vendor_amount, $driver_phone, $starting_km,
+        $paid_amount, $payment_type
     );
 
     $acceptedBookings = [];
@@ -115,7 +118,9 @@ try {
             "customer_name" => $customer_name,
             "vendor_amount" => $vendor_amount,
             "driver_phone" => $driver_phone,
-            "starting_km" => $starting_km
+            "starting_km" => $starting_km,
+            "paid_amount" => $paid_amount,
+            "payment_type" => $payment_type
         ];
     }
     $stmtAccepted->close();
@@ -152,7 +157,9 @@ try {
             b.vendor_amount,
             t.agni_share,
             d.full_name AS driver_name,
-            v.full_name AS vendor_name
+            v.full_name AS vendor_name,
+            b.paid_amount,
+            b.payment_type
         FROM 
             bookings b 
         LEFT JOIN 
@@ -179,7 +186,8 @@ try {
         $total_amount, $customer_contact, $trip_type, $kmRate, $packageKm, $packageHours, 
         $return_date, $return_time, $baseAmount, $extraKMAmount, $extraHoursAmount, 
         $agent_commission, $driverRate, $extraKMAmountFroDriver, $extraHoursAmountForDriver, 
-        $driver_allowance, $vendor_amount, $agni_share, $driver_name, $vendor_name
+        $driver_allowance, $vendor_amount, $agni_share, $driver_name, $vendor_name,
+        $paid_amount, $payment_type
     );
 
     $bookings = [];
@@ -262,7 +270,9 @@ try {
             "vendor_amount" => $vendor_amount,
             "agni_share" => $agni_share,
             "driver_name" => $driver_name,
-            "vendor_name" => $vendor_name
+            "vendor_name" => $vendor_name,
+            "paid_amount" => $paid_amount,
+            "payment_type" => $payment_type
         ];
     }
     $stmtPending->close();
