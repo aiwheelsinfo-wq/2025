@@ -94,65 +94,76 @@ if ($geoData['status'] === 'OK' && isset($geoData['results'][0])) {
     $toLon = $geoData['results'][0]['geometry']['location']['lng'];
 }
 
-// Step 3: Get all tripCostTable rows for matching car/tripType
-$costQuery = "SELECT * FROM tripCostTable WHERE tripType = ? AND carType = ?";
-$costStmt = $conn->prepare($costQuery);
-$costStmt->bind_param("ss", $tripType, $carType);
-$costStmt->execute();
-$costResult = $costStmt->get_result();
+// Step 3: Calculation for trip types
+if ($tripType === 'One-way') {
+    require_once __DIR__ . '/OneWayFareCalculator.php';
+    require_once __DIR__ . '/MigrationRunner.php';
+    MigrationRunner::run($conn);
 
-$finalCostRow = null;
-$fallbackRow = null;
+    $distanceKm = floatval($data['distance'] ?? 100);
+    $calc = OneWayFareCalculator::calculate($conn, $carType, $distanceKm, $data['from_address'] ?? '', $data['to_address'] ?? '');
 
-while ($row = $costResult->fetch_assoc()) {
-    $hasCoords = isset($row['minLat'], $row['maxLat'], $row['minLon'], $row['maxLon']) &&
-                 $row['minLat'] !== null && $row['maxLat'] !== null &&
-                 $row['minLon'] !== null && $row['maxLon'] !== null;
+    $data['kmRate']           = (string)$calc['km_rate'];
+    $data['baseAmount']       = (string)$calc['base_km_charge'];
+    $data['packageKm']        = round($distanceKm);
+    $data['gstPercent']       = (string)$calc['gst_breakdown']['rate'];
+    $data['gstMode']          = (string)$calc['gst_breakdown']['mode'];
+    $data['cgstPercent']      = (string)($calc['gst_breakdown']['cgst_percent'] ?? 2.5);
+    $data['sgstPercent']      = (string)($calc['gst_breakdown']['sgst_percent'] ?? 2.5);
+    $data['igstPercent']      = (string)($calc['gst_breakdown']['igst_percent'] ?? 5.0);
+    $data['driver_allowance']  = (string)$calc['driver_allowance'];
+    $data['driverAllowanceActive'] = $calc['driver_allowance_active'] ? 1 : 0;
+    $data['toll_charge']      = (string)$calc['toll_charge'];
+    $data['parking_charge']   = (string)$calc['parking_charge'];
+    $data['subtotal']         = (string)$calc['subtotal'];
+    $data['final_fare']       = (string)$calc['final_fare'];
+    $data['company_share_amount'] = (string)$calc['company_share_amount'];
+    $data['driver_payout_amount'] = (string)$calc['driver_payout_amount'];
+} else {
+    // Step 3 (Legacy): Get all tripCostTable rows for matching car/tripType
+    $costQuery = "SELECT * FROM tripCostTable WHERE tripType = ? AND carType = ?";
+    $costStmt = $conn->prepare($costQuery);
+    $costStmt->bind_param("ss", $tripType, $carType);
+    $costStmt->execute();
+    $costResult = $costStmt->get_result();
 
-    $isWithinBounds = false;
+    $finalCostRow = null;
+    $fallbackRow = null;
 
-    if ($tripType === 'One-way' && $toLat !== null && $toLon !== null && $hasCoords) {
-        if (
-            $toLat >= $row['minLat'] && $toLat <= $row['maxLat'] &&
-            $toLon >= $row['minLon'] && $toLon <= $row['maxLon']
-        ) {
-            $isWithinBounds = true;
+    while ($row = $costResult->fetch_assoc()) {
+        $hasCoords = isset($row['minLat'], $row['maxLat'], $row['minLon'], $row['maxLon']) &&
+                     $row['minLat'] !== null && $row['maxLat'] !== null &&
+                     $row['minLon'] !== null && $row['maxLon'] !== null;
+
+        if (!$finalCostRow) {
+            $finalCostRow = $row;
+        }
+
+        if (!$hasCoords && !$fallbackRow) {
+            $fallbackRow = $row;
         }
     }
 
-    if ($tripType === 'One-way' && $isWithinBounds) {
-        $finalCostRow = $row;
-        break;
+    if (!$finalCostRow && $fallbackRow) {
+        $finalCostRow = $fallbackRow;
     }
 
-    if ($tripType !== 'One-way' && !$finalCostRow) {
-        $finalCostRow = $row;
-    }
-
-    if (!$hasCoords && !$fallbackRow) {
-        $fallbackRow = $row;
-    }
-}
-
-if (!$finalCostRow && $fallbackRow) {
-    $finalCostRow = $fallbackRow;
-}
-
-// Step 4: Add tripCostTable fields to result
-if ($finalCostRow) {
-    $data['kmRate']           = $finalCostRow['kmRate'];
-    $data['baseAmount']       = $finalCostRow['baseAmount'];
-    $data['extraKMAmount']    = $finalCostRow['extraKMAmount'];
-    $data['extraHoursAmount'] = $finalCostRow['extraHoursAmount'];
-    $data['packageKm']        = $finalCostRow['packageKm'];
-    $data['packageHours']     = $finalCostRow['packageHours'];
-    $data['gstPercent']       = $finalCostRow['gstPercent'];
-    $data['driver_allowance']  = $finalCostRow['driver_allowance'];
-    $data['daily_limit']       = $finalCostRow['daily_limit'];
-    $data['driverRate']       = $finalCostRow['driverRate'];
-    $data['agni_share']       = $finalCostRow['agni_share'];
-    if (!isset($data['agent_commission']) || empty($data['agent_commission'])) {
-        $data['agent_commission'] = $finalCostRow['agni_share'] ?? 0;
+    // Step 4: Add tripCostTable fields to result
+    if ($finalCostRow) {
+        $data['kmRate']           = $finalCostRow['kmRate'];
+        $data['baseAmount']       = $finalCostRow['baseAmount'];
+        $data['extraKMAmount']    = $finalCostRow['extraKMAmount'];
+        $data['extraHoursAmount'] = $finalCostRow['extraHoursAmount'];
+        $data['packageKm']        = $finalCostRow['packageKm'];
+        $data['packageHours']     = $finalCostRow['packageHours'];
+        $data['gstPercent']       = $finalCostRow['gstPercent'];
+        $data['driver_allowance']  = $finalCostRow['driver_allowance'];
+        $data['daily_limit']       = $finalCostRow['daily_limit'];
+        $data['driverRate']       = $finalCostRow['driverRate'];
+        $data['agni_share']       = $finalCostRow['agni_share'];
+        if (!isset($data['agent_commission']) || empty($data['agent_commission'])) {
+            $data['agent_commission'] = $finalCostRow['agni_share'] ?? 0;
+        }
     }
 }
 // Step 5: Fetch active discount for this trip type

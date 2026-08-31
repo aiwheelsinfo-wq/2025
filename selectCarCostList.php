@@ -113,6 +113,78 @@ if (($fromLat !== null && $toLat !== null) && $distance_km == 100) {
     }
 }
 
+// -------------------------------------------------------------
+// ONE-WAY DYNAMIC PRICING & FARE CALCULATION ENGINE
+// -------------------------------------------------------------
+if ($tripType === 'One-way') {
+    require_once __DIR__ . '/OneWayFareCalculator.php';
+    require_once __DIR__ . '/MigrationRunner.php';
+    MigrationRunner::run($conn);
+
+    $cars = [];
+    $rulesQuery = "SELECT * FROM `one_way_vehicle_rules` WHERE `is_active` = 1 ORDER BY `display_order` ASC, `id` ASC";
+    $rulesRes = mysqli_query($conn, $rulesQuery);
+
+    if ($rulesRes && mysqli_num_rows($rulesRes) > 0) {
+        $gRes = mysqli_query($conn, "SELECT * FROM `one_way_global_settings` WHERE `id` = 1 LIMIT 1");
+        $global = $gRes ? mysqli_fetch_assoc($gRes) : [];
+
+        while ($rule = mysqli_fetch_assoc($rulesRes)) {
+            $carType = $rule['car_type_label'];
+            $carTypeId = (int)$rule['car_type_id'];
+
+            // 1. Calculate live dynamic fare with active settings
+            $calcRes = OneWayFareCalculator::calculate($conn, $carTypeId, $distance_km, $fromAddress ?? '', $toAddress ?? '');
+
+            // 2. Calculate baseline static fare without dynamic adjustments (to determine baseline/strikethrough price)
+            $staticOverrides = array_merge($global, ['dynamic_pricing_active' => 0, 'discount_active' => 0]);
+            $staticRes = OneWayFareCalculator::calculate($conn, $carTypeId, $distance_km, $fromAddress ?? '', $toAddress ?? '', $staticOverrides);
+
+            $finalFare = (float)$calcRes['final_fare'];
+            $staticFare = (float)$staticRes['final_fare'];
+
+            // Check if discounted (due to dynamic low demand OR promo discount)
+            $hasDiscount = ($finalFare < $staticFare);
+            $discountPct = 0.0;
+            if ($hasDiscount && $staticFare > 0) {
+                $discountPct = round((($staticFare - $finalFare) / $staticFare) * 100, 1);
+            }
+
+            // Map legacy metadata if available
+            $legacyMetaRes = mysqli_query($conn, "SELECT extraKMAmount, extraHoursAmount, packageHours, daily_limit, driverRate, agni_share FROM tripCostTable WHERE tripType='One-way' AND carType='$carType' LIMIT 1");
+            $meta = ($legacyMetaRes && $mRow = mysqli_fetch_assoc($legacyMetaRes)) ? $mRow : [];
+
+            $cars[$carType] = [
+                'carType' => $carType,
+                'kmRate' => (string)$calcRes['km_rate'],
+                'baseAmount' => (string)number_format($staticFare, 2, '.', ''),
+                'extraKMAmount' => (string)($meta['extraKMAmount'] ?? $calcRes['km_rate']),
+                'extraHoursAmount' => (string)($meta['extraHoursAmount'] ?? 0),
+                'packageKm' => round($distance_km),
+                'packageHours' => (string)($meta['packageHours'] ?? '0'),
+                'gstPercent' => (string)$calcRes['gst_breakdown']['rate'],
+                'driverAllowance' => (string)number_format($calcRes['driver_allowance'], 2, '.', ''),
+                'driverAllowanceActive' => $calcRes['driver_allowance_active'] ? 1 : 0,
+                'tollCharge' => (string)number_format($calcRes['toll_charge'], 2, '.', ''),
+                'parkingCharge' => (string)number_format($calcRes['parking_charge'], 2, '.', ''),
+                'kmPerDay' => (string)($meta['daily_limit'] ?? '250'),
+                'driverRate' => (string)($meta['driverRate'] ?? '0'),
+                'agni_share' => (string)($meta['agni_share'] ?? '0'),
+                'discounted_price' => (string)number_format($finalFare, 2, '.', ''),
+                'discount_percentage' => $discountPct,
+                'is_discounted' => $hasDiscount ? 1 : 0,
+                'company_share_amount' => (string)number_format($calcRes['company_share_amount'], 2, '.', ''),
+                'driver_payout_amount' => (string)number_format($calcRes['driver_payout_amount'], 2, '.', ''),
+                'dynamic_pricing' => $calcRes['dynamic_pricing'] ?? null,
+            ];
+        }
+
+        echo json_encode(array_values($cars), JSON_PRETTY_PRINT);
+        $conn->close();
+        exit;
+    }
+}
+
 // Fetch all trip costs for this tripType
 $sql = "SELECT * FROM tripCostTable WHERE tripType='$tripType' ORDER BY id ASC";
 $result = $conn->query($sql);
