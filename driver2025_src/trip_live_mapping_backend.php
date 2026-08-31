@@ -114,6 +114,8 @@ else if ($action === 'get_booking_otp') {
     b.parking_charge,
     b.permit_charge,
     b.event_duty_gst,
+    b.paid_amount,
+    b.payment_type,
     t.kmRate, 
     t.driver_allowance, 
     t.agni_share, 
@@ -167,6 +169,8 @@ else if ($action === 'get_booking_otp') {
                 'baseAmount' => $row['baseAmount'],
                 'driverRate' => $row['driverRate'],
                 'total_amount' => $row['total_amount'],
+                'paid_amount' => $row['paid_amount'],
+                'payment_type' => $row['payment_type'],
                 'agni_amount' => $row['agni_amount'],
                 'vendor_amount' => $row['vendor_amount'],
                 'distance' => $row['distance'],
@@ -176,13 +180,6 @@ else if ($action === 'get_booking_otp') {
                 'agent_commission' => $row['agent_commission'],
                 'gstPercent' => $row['gstPercent'],
                 'event_duty_gst'=>$row['event_duty_gst']
-                
-                
-                
-              
-              
-     
-                
             ]);
         } else {
             echo json_encode(['success' => false, 'message' => 'Booking not found.']);
