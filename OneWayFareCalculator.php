@@ -3,8 +3,9 @@
 require_once __DIR__ . '/FareCache.php';
 
 /**
- * Isolated One-Way Dynamic Fare Calculation Engine (v2.1)
- * Incorporates Supply-Demand Elasticity, Outlier Protection, and Hard Boundary Guarantees.
+ * Isolated One-Way Dynamic Fare & Commission Engine (v2.2)
+ * Incorporates Supply-Demand Elasticity, Outlier Protection, Boundary Protection,
+ * and Automated Company Share / Driver Net Payout Split.
  * All monetary calculations performed in integer paise to eliminate floating-point drift.
  */
 class OneWayFareCalculator {
@@ -145,6 +146,37 @@ class OneWayFareCalculator {
         // Final Fare (in integer paise -> converted to clean float)
         $finalFareP = max(0, $grossTotalP - $discountP);
 
+        // 10. Company Share & Driver Net Payout Calculation
+        $companyShareActive = !empty($global['company_share_active']);
+        $companyShareType = $global['company_share_type'] ?? 'percentage';
+        $companyShareBasis = $global['company_share_basis'] ?? 'subtotal';
+        
+        // Check if vehicle rule has specific override
+        $vehShareOverride = (float)($vehRule['company_share_percent'] ?? 0.0);
+        $companyShareValue = ($vehShareOverride > 0) ? $vehShareOverride : (float)($global['company_share_value'] ?? 15.0);
+
+        $companyShareP = 0;
+        if ($companyShareActive && $companyShareValue > 0) {
+            $basisP = ($companyShareBasis === 'base_km') ? $baseKmChargeP : $subtotalP;
+            if ($companyShareType === 'fixed') {
+                $companyShareP = min($basisP, self::toPaise($companyShareValue));
+            } else {
+                $companyShareP = self::pctOf($basisP, $companyShareValue);
+            }
+        }
+
+        $driverPayoutP = max(0, $subtotalP - $companyShareP);
+
+        $companyShareBreakdown = [
+            'is_active'       => $companyShareActive,
+            'type'            => $companyShareType,
+            'value'           => $companyShareValue,
+            'basis'           => $companyShareBasis,
+            'company_share'   => self::fromPaise($companyShareP),
+            'driver_payout'   => self::fromPaise($driverPayoutP),
+            'is_veh_override' => ($vehShareOverride > 0)
+        ];
+
         return [
             'master_engine_active'    => (bool)($global['master_engine_active'] ?? true),
             'car_type'                => $vehRule['car_type_label'] ?? (string)$carType,
@@ -166,6 +198,9 @@ class OneWayFareCalculator {
             'discount_active'         => (bool)($global['discount_active'] ?? false),
             'final_fare'              => self::fromPaise($finalFareP),
             'final_fare_rounded'      => round(self::fromPaise($finalFareP)),
+            'company_share_amount'    => self::fromPaise($companyShareP),
+            'driver_payout_amount'    => self::fromPaise($driverPayoutP),
+            'company_share_breakdown' => $companyShareBreakdown,
         ];
     }
 
@@ -332,7 +367,6 @@ class OneWayFareCalculator {
         $activeDriversRes = mysqli_query($conn, "SELECT COUNT(*) as total FROM `drivers` WHERE `status` = 'approved' OR `status` = 'active'");
         $availableVehicles = ($activeDriversRes && $dRow = mysqli_fetch_assoc($activeDriversRes)) ? max(5, (int)$dRow['total']) : 12;
 
-        // If no bookings yet today, assume baseline supply-demand ratio
         if ($todayBookings <= 0) {
             return 1.0000;
         }
@@ -527,6 +561,10 @@ class OneWayFareCalculator {
             'oneway_pricing_sensitivity' => 50.0,
             'outlier_threshold_pct'      => 50.0,
             'historical_lookback_days'   => 14,
+            'company_share_active'       => 1,
+            'company_share_type'         => 'percentage',
+            'company_share_value'        => 15.0,
+            'company_share_basis'        => 'subtotal',
             'row_version'                => 1
         ];
     }
@@ -544,6 +582,7 @@ class OneWayFareCalculator {
             'max_rate'               => 0.0,
             'min_rate_multiplier'    => 0.80,
             'max_rate_multiplier'    => 1.40,
+            'company_share_percent'  => 0.0,
             'is_active'              => 1,
             'row_version'            => 1
         ];
