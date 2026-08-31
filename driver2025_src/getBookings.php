@@ -1,6 +1,6 @@
 <?php
 header("Content-Type: application/json");
-require_once __DIR__ . '/../db_connect.php'; // Database connection
+require_once __DIR__ . '/db_connect.php'; // Database connection
 
 $vendor_phone = $_POST['phone_number'] ?? null;
 $driver_phone = $_POST['phone_number'] ?? null;
