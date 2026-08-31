@@ -46,8 +46,43 @@ $toLon   = isset($_GET['toLng']) ? floatval($_GET['toLng']) : null;
 $distance_km = 100; // Default fallback distance in km
 $apiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM';
 
-// If bookingId exists but no coordinates, fetch from DB & geocode
-if ($bookingId > 0) {
+$rawFromAddress = $_GET['fromAddress'] ?? $_GET['from_address'] ?? '';
+$rawToAddress   = $_GET['toAddress'] ?? $_GET['to_address'] ?? '';
+
+// 1. Direct explicit distance parameter passed by frontend
+if (isset($_GET['distance']) && floatval($_GET['distance']) > 0 && floatval($_GET['distance']) < 900) {
+    $distance_km = floatval($_GET['distance']);
+} 
+// 2. Direct fromAddress & toAddress passed by frontend
+elseif (!empty($rawFromAddress) && !empty($rawToAddress)) {
+    $fromEnc = urlencode($rawFromAddress);
+    $toEnc = urlencode($rawToAddress);
+    $distUrl = "https://maps.googleapis.com/maps/api/distancematrix/json?origins=$fromEnc&destinations=$toEnc&key=$apiKey";
+    $distResponse = @file_get_contents($distUrl);
+    if ($distResponse) {
+        $distData = json_decode($distResponse, true);
+        if ($distData['status'] === 'OK' && !empty($distData['rows'][0]['elements'][0]['distance']['text'])) {
+            $distanceText = $distData['rows'][0]['elements'][0]['distance']['text'];
+            $cleanText = str_replace([',', ' '], '', explode(' ', $distanceText)[0]);
+            $distance_km = floatval($cleanText);
+        }
+    }
+}
+// 3. Fallback: Calculate distance from passed coordinates
+elseif ($fromLat !== null && $toLat !== null) {
+    $distUrl = "https://maps.googleapis.com/maps/api/distancematrix/json?origins=$fromLat,$fromLon&destinations=$toLat,$toLon&key=$apiKey";
+    $distResponse = @file_get_contents($distUrl);
+    if ($distResponse) {
+        $distData = json_decode($distResponse, true);
+        if ($distData['status'] === 'OK' && !empty($distData['rows'][0]['elements'][0]['distance']['text'])) {
+            $distanceText = $distData['rows'][0]['elements'][0]['distance']['text'];
+            $cleanText = str_replace([',', ' '], '', explode(' ', $distanceText)[0]);
+            $distance_km = floatval($cleanText);
+        }
+    }
+}
+// 4. Fallback to bookingId if none of the above are provided
+elseif ($bookingId > 0) {
     $stmt = $conn->prepare("SELECT from_address, to_address FROM bookings WHERE id = ?");
     $stmt->bind_param("i", $bookingId);
     $stmt->execute();
@@ -58,31 +93,6 @@ if ($bookingId > 0) {
         $fromAddress = urlencode($row['from_address']);
         $toAddress = urlencode($row['to_address']);
 
-        if (!empty($row['from_address']) && $fromLat === null) {
-            $geoUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=$fromAddress&key=$apiKey";
-            $geoResponse = @file_get_contents($geoUrl);
-            if ($geoResponse) {
-                $geoData = json_decode($geoResponse, true);
-                if ($geoData['status'] === 'OK') {
-                    $fromLat = $geoData['results'][0]['geometry']['location']['lat'];
-                    $fromLon = $geoData['results'][0]['geometry']['location']['lng'];
-                }
-            }
-        }
-
-        if (!empty($row['to_address']) && $toLat === null) {
-            $geoUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=$toAddress&key=$apiKey";
-            $geoResponse = @file_get_contents($geoUrl);
-            if ($geoResponse) {
-                $geoData = json_decode($geoResponse, true);
-                if ($geoData['status'] === 'OK') {
-                    $toLat = $geoData['results'][0]['geometry']['location']['lat'];
-                    $toLon = $geoData['results'][0]['geometry']['location']['lng'];
-                }
-            }
-        }
-
-        // Fetch distance from Google Distance Matrix API
         if (!empty($row['from_address']) && !empty($row['to_address'])) {
             $distUrl = "https://maps.googleapis.com/maps/api/distancematrix/json?origins=$fromAddress&destinations=$toAddress&key=$apiKey";
             $distResponse = @file_get_contents($distUrl);
@@ -97,20 +107,6 @@ if ($bookingId > 0) {
         }
     }
     if ($stmt) $stmt->close();
-}
-
-// Fallback: Calculate distance from passed coordinates if bookingId didn't yield it
-if (($fromLat !== null && $toLat !== null) && $distance_km == 100) {
-    $distUrl = "https://maps.googleapis.com/maps/api/distancematrix/json?origins=$fromLat,$fromLon&destinations=$toLat,$toLon&key=$apiKey";
-    $distResponse = @file_get_contents($distUrl);
-    if ($distResponse) {
-        $distData = json_decode($distResponse, true);
-        if ($distData['status'] === 'OK' && !empty($distData['rows'][0]['elements'][0]['distance']['text'])) {
-            $distanceText = $distData['rows'][0]['elements'][0]['distance']['text'];
-            $cleanText = str_replace([',', ' '], '', explode(' ', $distanceText)[0]);
-            $distance_km = floatval($cleanText);
-        }
-    }
 }
 
 // -------------------------------------------------------------
