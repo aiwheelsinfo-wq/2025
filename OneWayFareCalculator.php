@@ -255,6 +255,17 @@ class OneWayFareCalculator {
         // 5. Dynamic One-Way Rate
         $dynamicRate = $baseRate * (1.0 + ($priceAdjustmentPct / 100.0));
 
+        // 5b. Special Festival / Holiday Event Multiplier Check
+        $specialEvent = self::getSpecialEventForDate($conn, $targetDateStr);
+        if ($specialEvent !== null && $specialEvent['multiplier'] > 1.0) {
+            $eventMultiplier = (float)$specialEvent['multiplier'];
+            $eventSurgePct = ($eventMultiplier - 1.0) * 100.0;
+            if ($dynamicRate < ($baseRate * $eventMultiplier)) {
+                $dynamicRate = $baseRate * $eventMultiplier;
+                $priceAdjustmentPct = $eventSurgePct;
+            }
+        }
+
         // 6. Minimum / Maximum Boundary Protection
         $minRate = (float)($vehRule['min_rate'] ?? 0.0);
         $maxRate = (float)($vehRule['max_rate'] ?? 0.0);
@@ -407,6 +418,23 @@ class OneWayFareCalculator {
      */
     public static function getTodaysOneWayDemand(mysqli $conn): float {
         return self::getOneWayDemandForDate($conn, date('Y-m-d'));
+    }
+
+    /**
+     * Checks if a target travel date falls into an active Special Holiday / Festival Event
+     */
+    public static function getSpecialEventForDate(mysqli $conn, string $targetDate): ?array {
+        $escDate = mysqli_real_escape_string($conn, $targetDate);
+        $res = mysqli_query($conn, "SELECT * FROM `one_way_special_events` WHERE `is_active` = 1 AND `start_date` <= '$escDate' AND `end_date` >= '$escDate' ORDER BY `multiplier` DESC LIMIT 1");
+        if ($res && $row = mysqli_fetch_assoc($res)) {
+            return [
+                'name' => $row['event_name'],
+                'multiplier' => (float)$row['multiplier'],
+                'category' => $row['category'],
+                'reason' => $row['reason']
+            ];
+        }
+        return null;
     }
 
     /**
