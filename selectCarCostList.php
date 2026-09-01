@@ -124,17 +124,18 @@ if ($tripType === 'One-way') {
     if ($rulesRes && mysqli_num_rows($rulesRes) > 0) {
         $gRes = mysqli_query($conn, "SELECT * FROM `one_way_global_settings` WHERE `id` = 1 LIMIT 1");
         $global = $gRes ? mysqli_fetch_assoc($gRes) : [];
+        $targetDate = $_GET['pickupDate'] ?? $_GET['pickup_date'] ?? $_GET['date'] ?? date('Y-m-d');
 
         while ($rule = mysqli_fetch_assoc($rulesRes)) {
             $carType = $rule['car_type_label'];
             $carTypeId = (int)$rule['car_type_id'];
 
-            // 1. Calculate live dynamic fare with active settings
-            $calcRes = OneWayFareCalculator::calculate($conn, $carTypeId, $distance_km, $fromAddress ?? '', $toAddress ?? '');
+            // 1. Calculate live dynamic fare with active settings for the specific requested travel date
+            $calcRes = OneWayFareCalculator::calculate($conn, $carTypeId, $distance_km, $fromAddress ?? '', $toAddress ?? '', [], $targetDate);
 
             // 2. Calculate baseline static fare without dynamic adjustments (to determine baseline/strikethrough price)
             $staticOverrides = array_merge($global, ['dynamic_pricing_active' => 0, 'discount_active' => 0]);
-            $staticRes = OneWayFareCalculator::calculate($conn, $carTypeId, $distance_km, $fromAddress ?? '', $toAddress ?? '', $staticOverrides);
+            $staticRes = OneWayFareCalculator::calculate($conn, $carTypeId, $distance_km, $fromAddress ?? '', $toAddress ?? '', $staticOverrides, $targetDate);
 
             $finalFare = (float)$calcRes['final_fare'];
             $staticFare = (float)$staticRes['final_fare'];

@@ -27,7 +27,8 @@ class OneWayFareCalculator {
         float $distanceKm,
         string $pickupAddress = '',
         string $dropAddress = '',
-        array $settingsOverride = []
+        array $settingsOverride = [],
+        ?string $targetDate = null
     ): array {
         // 1. Fetch Global Settings (Cached)
         $global = self::getGlobalSettings($conn);
@@ -49,8 +50,8 @@ class OneWayFareCalculator {
         // Raw Base KM Charge (in integer paise)
         $rawBaseKmCharge = $chargeableKm * $kmRate;
 
-        // 4. One-Way Dynamic Pricing Calculation (if active)
-        $dynamicMetrics = self::calculateOneWayDynamicDemand($conn, $global, $vehRule, $rawBaseKmCharge, $settingsOverride);
+        // 4. One-Way Dynamic Pricing Calculation (if active, date-aware)
+        $dynamicMetrics = self::calculateOneWayDynamicDemand($conn, $global, $vehRule, $rawBaseKmCharge, $settingsOverride, $targetDate);
         $effectiveBaseKmCharge = $dynamicMetrics['final_one_way_rate'] > 0 ? $dynamicMetrics['final_one_way_rate'] : $rawBaseKmCharge;
         $baseKmChargeP = self::toPaise($effectiveBaseKmCharge);
 
@@ -213,7 +214,8 @@ class OneWayFareCalculator {
         array $global,
         array $vehRule,
         float $baseRate,
-        array $overrides = []
+        array $overrides = [],
+        ?string $targetDate = null
     ): array {
         $isActive = !empty($global['dynamic_pricing_active']);
         $sensitivity = isset($overrides['oneway_pricing_sensitivity']) 
@@ -228,10 +230,11 @@ class OneWayFareCalculator {
             ? (float)$overrides['simulated_reference_demand']
             : self::getHistoricalOneWayReferenceDemand($conn, $global, $outlierThreshold);
 
-        // 2. Today's One-Way Demand (today's booking volume)
+        // 2. Travel-Date Aware One-Way Demand volume
+        $targetDateStr = !empty($targetDate) ? $targetDate : ($overrides['target_date'] ?? date('Y-m-d'));
         $todayDemand = isset($overrides['simulated_today_demand'])
             ? (float)$overrides['simulated_today_demand']
-            : self::getTodaysOneWayDemand($conn);
+            : self::getOneWayDemandForDate($conn, $targetDateStr);
 
         // Fallbacks for safety
         if ($refDemand <= 0) $refDemand = 1.0;
@@ -373,13 +376,37 @@ class OneWayFareCalculator {
     }
 
     /**
-     * Calculates Today's One-Way Demand volume
+     * Calculates One-Way Demand volume for a specific travel date
+     */
+    public static function getOneWayDemandForDate(mysqli $conn, string $targetDate): float {
+        $todayDate = date('Y-m-d');
+        
+        // If target travel date is today, check today's live bookings
+        if ($targetDate === $todayDate) {
+            $todayRes = mysqli_query($conn, "SELECT COUNT(*) as today_count FROM `bookings` WHERE LOWER(`trip_type`) LIKE '%one-way%' AND `date` = '$todayDate'");
+            return ($todayRes && $bRow = mysqli_fetch_assoc($todayRes)) ? (float)$bRow['today_count'] : 0.0;
+        }
+
+        // If target travel date is in the future
+        $escDate = mysqli_real_escape_string($conn, $targetDate);
+        $res = mysqli_query($conn, "SELECT COUNT(*) as future_count FROM `bookings` WHERE LOWER(`trip_type`) LIKE '%one-way%' AND `date` = '$escDate'");
+        $futureCount = ($res && $bRow = mysqli_fetch_assoc($res)) ? (int)$bRow['future_count'] : 0;
+
+        // For future dates:
+        // If low advance bookings (0 to 2), return 0.0 so engine uses standard 1.00 baseline (0% surge)
+        // If heavy advance bookings (3+ bookings), return the actual pre-booking count to activate advance surge!
+        if ($futureCount <= 2) {
+            return 0.0;
+        }
+
+        return (float)$futureCount;
+    }
+
+    /**
+     * Calculates Today's One-Way Demand volume (legacy helper)
      */
     public static function getTodaysOneWayDemand(mysqli $conn): float {
-        $todayRes = mysqli_query($conn, "SELECT COUNT(*) as today_count FROM `bookings` WHERE LOWER(`trip_type`) LIKE '%one-way%' AND `date` = CURDATE()");
-        $todayBookings = ($todayRes && $bRow = mysqli_fetch_assoc($todayRes)) ? (int)$bRow['today_count'] : 0;
-
-        return (float)$todayBookings;
+        return self::getOneWayDemandForDate($conn, date('Y-m-d'));
     }
 
     /**
