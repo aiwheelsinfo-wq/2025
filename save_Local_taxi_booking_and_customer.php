@@ -23,56 +23,65 @@ if (!isset($conn) || $conn->connect_error) {
 }
 
 try {
-    $data = json_decode(file_get_contents("php://input"), true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        echo json_encode(["status" => "error", "message" => "Invalid JSON data: " . json_last_error_msg()]);
+    $raw = file_get_contents("php://input");
+    $data = json_decode($raw, true);
+    if (!is_array($data) || empty($data)) {
+        $data = $_POST;
+    }
+    if (!is_array($data) || empty($data)) {
+        echo json_encode(["status" => "error", "message" => "No booking data received."]);
         exit;
     }
 
     // ✅ Required fields
     $required_fields = [
-        'booking_number', 'phone_number', 'name', 'email', 'city',
-        'pincode', 'from_address', 'to_address', 'car_type', 'total_amount', 'distance'
+        'phone_number', 'name', 'email', 'city',
+        'pincode', 'from_address', 'car_type', 'total_amount', 'distance'
     ];
 
     foreach ($required_fields as $field) {
-        if (!isset($data[$field]) || empty(trim($data[$field]))) {
+        if (!isset($data[$field]) || strlen(trim((string)$data[$field])) === 0) {
             echo json_encode(["status" => "error", "message" => "Missing or empty required field: $field"]);
             exit;
         }
     }
 
     // ✅ Sanitize input
-    $booking_number = $conn->real_escape_string($data['booking_number']);
     $phone_number   = $conn->real_escape_string($data['phone_number']);
+    $booking_number = !empty($data['booking_number']) ? $conn->real_escape_string($data['booking_number']) : $phone_number;
     $name           = $conn->real_escape_string($data['name']);
     $email          = $conn->real_escape_string($data['email']);
     $city           = $conn->real_escape_string($data['city']);
     $pincode        = $conn->real_escape_string($data['pincode']);
     $from_address   = $conn->real_escape_string($data['from_address']);
-    $to_address     = $conn->real_escape_string($data['to_address']);
+    $to_address     = isset($data['to_address']) ? $conn->real_escape_string($data['to_address']) : '';
     $car_type       = $conn->real_escape_string($data['car_type']);
     $total_amount   = floatval($data['total_amount']);
     $distance       = floatval($data['distance']);
 
-    $from_lat = (isset($data['from_lat']) && !empty(trim($data['from_lat']))) ? floatval($data['from_lat']) : null;
-    $from_lng = (isset($data['from_lng']) && !empty(trim($data['from_lng']))) ? floatval($data['from_lng']) : null;
-    $to_lat   = (isset($data['to_lat']) && !empty(trim($data['to_lat']))) ? floatval($data['to_lat']) : null;
-    $to_lng   = (isset($data['to_lng']) && !empty(trim($data['to_lng']))) ? floatval($data['to_lng']) : null;
+    $from_lat = (isset($data['from_lat']) && !empty(trim((string)$data['from_lat']))) ? floatval($data['from_lat']) : null;
+    $from_lng = (isset($data['from_lng']) && !empty(trim((string)$data['from_lng']))) ? floatval($data['from_lng']) : null;
+    $to_lat   = (isset($data['to_lat']) && !empty(trim((string)$data['to_lat']))) ? floatval($data['to_lat']) : null;
+    $to_lng   = (isset($data['to_lng']) && !empty(trim((string)$data['to_lng']))) ? floatval($data['to_lng']) : null;
 
     // ✅ Geocode function
     function getCoordinates($address) {
-        $apiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM'; // Replace with your API key
+        if (empty(trim((string)$address))) return false;
+        $apiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM';
         $encodedAddress = urlencode($address);
         $url = "https://maps.googleapis.com/maps/api/geocode/json?address=$encodedAddress&key=$apiKey";
-        $response = file_get_contents($url);
-        $data = json_decode($response);
-
-        if ($data->status === 'OK') {
-            return [
-                'lat' => $data->results[0]->geometry->location->lat,
-                'lng' => $data->results[0]->geometry->location->lng
-            ];
+        $ctx = stream_context_create([
+            'http' => ['timeout' => 2.0]
+        ]);
+        $response = @file_get_contents($url, false, $ctx);
+        if ($response) {
+            $data = json_decode($response);
+            if (isset($data->status) && $data->status === 'OK' && isset($data->results[0])) {
+                return [
+                    'lat' => $data->results[0]->geometry->location->lat,
+                    'lng' => $data->results[0]->geometry->location->lng
+                ];
+            }
         }
         return false;
     }
@@ -90,21 +99,16 @@ try {
         }
     }
 
-    if ($from_lat !== null && $from_lng !== null) {
+    if ($from_lat !== null && $from_lng !== null && floatval($from_lat) != 0) {
         $fromCoords = ['lat' => $from_lat, 'lng' => $from_lng];
     } else {
-        $fromCoords = getCoordinates($from_address);
+        $fromCoords = getCoordinates($from_address) ?: ['lat' => 19.0760, 'lng' => 72.8777];
     }
 
-    if ($to_lat !== null && $to_lng !== null) {
+    if ($to_lat !== null && $to_lng !== null && floatval($to_lat) != 0) {
         $toCoords = ['lat' => $to_lat, 'lng' => $to_lng];
     } else {
-        $toCoords = getCoordinates($to_address);
-    }
-
-    if (!$fromCoords || !$toCoords) {
-        echo json_encode(["status" => "error", "message" => "Unable to geocode one or both addresses."]);
-        exit;
+        $toCoords = (!empty($to_address) ? getCoordinates($to_address) : null) ?: ['lat' => 19.2183, 'lng' => 72.9781];
     }
 
     // Check if there is any active vendor/driver within 5 km
