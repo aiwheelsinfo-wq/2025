@@ -182,6 +182,63 @@ if ($tripType === 'One-way') {
     }
 }
 
+// -------------------------------------------------------------
+// LOCAL TAXI DYNAMIC PRICING & FARE CALCULATION ENGINE
+// -------------------------------------------------------------
+if ($tripType === 'Local Taxi' || $tripType === 'Local-Taxi' || strtolower($tripType) === 'local taxi') {
+    require_once __DIR__ . '/LocalTaxiFareCalculator.php';
+
+    $cars = [];
+    $rulesQuery = "SELECT * FROM `local_taxi_vehicle_rules` WHERE `is_active` = 1 ORDER BY `display_order` ASC, `id` ASC";
+    $rulesRes = mysqli_query($conn, $rulesQuery);
+
+    if ($rulesRes && mysqli_num_rows($rulesRes) > 0) {
+        $pickupTime = $_GET['pickupTime'] ?? $_GET['pickup_time'] ?? '';
+
+        while ($rule = mysqli_fetch_assoc($rulesRes)) {
+            $carType = $rule['car_type_label'];
+            $carTypeId = (int)$rule['car_type_id'];
+
+            $calcRes = LocalTaxiFareCalculator::calculate($conn, $carType, $distance_km, $pickupTime);
+
+            $finalFare = (float)$calcRes['final_customer_fare'];
+            $staticFare = (float)($rule['base_fare'] + max(0, $distance_km - $rule['included_base_km']) * $rule['per_km_rate']) * 1.05;
+
+            $hasDiscount = ($finalFare < $staticFare);
+            $discountPct = 0.0;
+            if ($hasDiscount && $staticFare > 0) {
+                $discountPct = round((($staticFare - $finalFare) / $staticFare) * 100, 1);
+            }
+
+            $cars[$carType] = [
+                'carType' => $carType,
+                'kmRate' => (string)$calcRes['effective_km_rate'],
+                'baseAmount' => (string)number_format($staticFare, 2, '.', ''),
+                'extraKMAmount' => (string)$calcRes['effective_km_rate'],
+                'extraHoursAmount' => (string)($rule['waiting_charge_per_min'] ?? '2.00'),
+                'packageKm' => round($distance_km),
+                'packageHours' => '0',
+                'gstPercent' => (string)$calcRes['gst_rate'],
+                'driverAllowance' => '0.00',
+                'driverAllowanceActive' => 0,
+                'tollCharge' => '0.00',
+                'parkingCharge' => '0.00',
+                'discounted_price' => (string)number_format($finalFare, 2, '.', ''),
+                'discount_percentage' => $discountPct,
+                'is_discounted' => $hasDiscount ? 1 : 0,
+                'company_share_amount' => (string)number_format($calcRes['company_share_amount'], 2, '.', ''),
+                'driver_payout_amount' => (string)number_format($calcRes['driver_payout_amount'], 2, '.', ''),
+                'dynamic_pricing' => $calcRes['dynamic_pricing'] ?? null,
+                'time_surcharges' => $calcRes['time_surcharges'] ?? null
+            ];
+        }
+
+        echo json_encode(array_values($cars), JSON_PRETTY_PRINT);
+        $conn->close();
+        exit;
+    }
+}
+
 // Fetch all trip costs for this tripType
 $sql = "SELECT * FROM tripCostTable WHERE tripType='$tripType' ORDER BY id ASC";
 $result = $conn->query($sql);
