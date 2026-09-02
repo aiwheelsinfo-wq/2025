@@ -23,9 +23,13 @@ if (!isset($conn) || $conn->connect_error) {
 }
 
 try {
-    $data = json_decode(file_get_contents("php://input"), true);
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        echo json_encode(["status" => "error", "message" => "Invalid JSON data: " . json_last_error_msg()]);
+    $raw = file_get_contents("php://input");
+    $data = json_decode($raw, true);
+    if (!is_array($data) || empty($data)) {
+        $data = $_POST;
+    }
+    if (!is_array($data) || empty($data)) {
+        echo json_encode(["status" => "error", "message" => "No booking data received."]);
         exit;
     }
 
@@ -36,7 +40,7 @@ try {
     ];
 
     foreach ($required_fields as $field) {
-        if (!isset($data[$field]) || empty(trim($data[$field]))) {
+        if (!isset($data[$field]) || strlen(trim((string)$data[$field])) === 0) {
             echo json_encode(["status" => "error", "message" => "Missing or empty required field: $field"]);
             exit;
         }
