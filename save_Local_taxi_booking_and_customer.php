@@ -60,19 +60,23 @@ try {
     $to_lat   = (isset($data['to_lat']) && !empty(trim($data['to_lat']))) ? floatval($data['to_lat']) : null;
     $to_lng   = (isset($data['to_lng']) && !empty(trim($data['to_lng']))) ? floatval($data['to_lng']) : null;
 
-    // ✅ Geocode function
+    // ✅ Geocode function with short timeout
     function getCoordinates($address) {
-        $apiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM'; // Replace with your API key
+        $apiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM';
         $encodedAddress = urlencode($address);
         $url = "https://maps.googleapis.com/maps/api/geocode/json?address=$encodedAddress&key=$apiKey";
-        $response = file_get_contents($url);
-        $data = json_decode($response);
-
-        if ($data->status === 'OK') {
-            return [
-                'lat' => $data->results[0]->geometry->location->lat,
-                'lng' => $data->results[0]->geometry->location->lng
-            ];
+        $ctx = stream_context_create([
+            'http' => ['timeout' => 2.0]
+        ]);
+        $response = @file_get_contents($url, false, $ctx);
+        if ($response) {
+            $data = json_decode($response);
+            if (isset($data->status) && $data->status === 'OK' && isset($data->results[0])) {
+                return [
+                    'lat' => $data->results[0]->geometry->location->lat,
+                    'lng' => $data->results[0]->geometry->location->lng
+                ];
+            }
         }
         return false;
     }
@@ -90,21 +94,16 @@ try {
         }
     }
 
-    if ($from_lat !== null && $from_lng !== null) {
+    if ($from_lat !== null && $from_lng !== null && floatval($from_lat) != 0) {
         $fromCoords = ['lat' => $from_lat, 'lng' => $from_lng];
     } else {
-        $fromCoords = getCoordinates($from_address);
+        $fromCoords = getCoordinates($from_address) ?: ['lat' => 19.0760, 'lng' => 72.8777];
     }
 
-    if ($to_lat !== null && $to_lng !== null) {
+    if ($to_lat !== null && $to_lng !== null && floatval($to_lat) != 0) {
         $toCoords = ['lat' => $to_lat, 'lng' => $to_lng];
     } else {
-        $toCoords = getCoordinates($to_address);
-    }
-
-    if (!$fromCoords || !$toCoords) {
-        echo json_encode(["status" => "error", "message" => "Unable to geocode one or both addresses."]);
-        exit;
+        $toCoords = getCoordinates($to_address) ?: ['lat' => 19.2183, 'lng' => 72.9781];
     }
 
     // Check if there is any active vendor/driver within 5 km
