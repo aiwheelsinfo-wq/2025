@@ -202,18 +202,16 @@ if ($tripType === 'Local Taxi' || $tripType === 'Local-Taxi' || strtolower($trip
             $calcRes = LocalTaxiFareCalculator::calculate($conn, $carType, $distance_km, $pickupTime);
 
             $finalFare = (float)$calcRes['final_customer_fare'];
-            $staticFare = (float)($rule['base_fare'] + max(0, $distance_km - $rule['included_base_km']) * $rule['per_km_rate']) * 1.05;
-
-            $hasDiscount = ($finalFare < $staticFare);
-            $discountPct = 0.0;
-            if ($hasDiscount && $staticFare > 0) {
-                $discountPct = round((($staticFare - $finalFare) / $staticFare) * 100, 1);
-            }
+            
+            // Standard Market Offline / Aggregator Baseline (for strikethrough saver display)
+            $marketBaseline = ceil(($finalFare * 1.15) / 5) * 5;
+            $discountPct = round((($marketBaseline - $finalFare) / $marketBaseline) * 100);
+            $hasDiscount = ($discountPct > 0);
 
             $cars[$carType] = [
                 'carType' => $carType,
                 'kmRate' => (string)$calcRes['effective_km_rate'],
-                'baseAmount' => (string)number_format($staticFare, 2, '.', ''),
+                'baseAmount' => (string)number_format($marketBaseline, 2, '.', ''),
                 'extraKMAmount' => (string)$calcRes['effective_km_rate'],
                 'extraHoursAmount' => (string)($rule['waiting_charge_per_min'] ?? '2.00'),
                 'packageKm' => round($distance_km),
