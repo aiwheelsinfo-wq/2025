@@ -19,20 +19,26 @@ if (empty($data)) {
     exit;
 }
 
+function formatTime($t, $default) {
+    if (empty($t)) return $default;
+    if (strlen($t) === 5) return $t . ':00';
+    return $t;
+}
+
 // 1. Update Global Settings
 if (!empty($data['global_settings'])) {
     $g = $data['global_settings'];
     $dynActive = !empty($g['dynamic_pricing_active']) ? 1 : 0;
     $sensitivity = (float)($g['pricing_sensitivity'] ?? 50.0);
     $peakActive = !empty($g['peak_surge_active']) ? 1 : 0;
-    $mStart = $g['peak_morning_start'] ?? '08:00:00';
-    $mEnd = $g['peak_morning_end'] ?? '11:00:00';
-    $eStart = $g['peak_evening_start'] ?? '17:30:00';
-    $eEnd = $g['peak_evening_end'] ?? '21:00:00';
+    $mStart = formatTime($g['peak_morning_start'] ?? '', '08:00:00');
+    $mEnd = formatTime($g['peak_morning_end'] ?? '', '11:00:00');
+    $eStart = formatTime($g['peak_evening_start'] ?? '', '17:30:00');
+    $eEnd = formatTime($g['peak_evening_end'] ?? '', '21:00:00');
     $pMult = (float)($g['peak_multiplier'] ?? 1.25);
     $nightActive = !empty($g['night_surcharge_active']) ? 1 : 0;
-    $nStart = $g['night_start'] ?? '23:00:00';
-    $nEnd = $g['night_end'] ?? '05:00:00';
+    $nStart = formatTime($g['night_start'] ?? '', '23:00:00');
+    $nEnd = formatTime($g['night_end'] ?? '', '05:00:00');
     $nMult = (float)($g['night_multiplier'] ?? 1.20);
     $gstActive = !empty($g['gst_active']) ? 1 : 0;
     $gstRate = (float)($g['gst_rate'] ?? 5.0);
@@ -40,7 +46,7 @@ if (!empty($data['global_settings'])) {
     $cType = $g['company_share_type'] ?? 'percent';
     $cVal = (float)($g['company_share_value'] ?? 10.0);
 
-    $stmt = $conn->prepare("UPDATE `local_taxi_global_settings` SET 
+    $sql = "UPDATE `local_taxi_global_settings` SET 
         `dynamic_pricing_active` = ?,
         `pricing_sensitivity` = ?,
         `peak_surge_active` = ?,
@@ -59,14 +65,17 @@ if (!empty($data['global_settings'])) {
         `company_share_type` = ?,
         `company_share_value` = ?
         WHERE `id` = 1
-    ");
+    ";
 
-    $stmt->bind_param("idissdsissdsidsd", 
-        $dynActive, $sensitivity, $peakActive, $mStart, $mEnd, $eStart, $eEnd, $pMult,
-        $nightActive, $nStart, $nEnd, $nMult, $gstActive, $gstRate, $cActive, $cType, $cVal
-    );
-    $stmt->execute();
-    $stmt->close();
+    $stmt = $conn->prepare($sql);
+    if ($stmt) {
+        $stmt->bind_param("idissssdissdidisd", 
+            $dynActive, $sensitivity, $peakActive, $mStart, $mEnd, $eStart, $eEnd, $pMult,
+            $nightActive, $nStart, $nEnd, $nMult, $gstActive, $gstRate, $cActive, $cType, $cVal
+        );
+        $stmt->execute();
+        $stmt->close();
+    }
 }
 
 // 2. Update Vehicle Rules
@@ -90,9 +99,11 @@ if (!empty($data['vehicles']) && is_array($data['vehicles'])) {
             `is_active` = ?
             WHERE `car_type_label` = ?
         ");
-        $stmt->bind_param("ddddddis", $baseFare, $incKm, $perKm, $waitMin, $minFloor, $maxCeil, $isActive, $carLabel);
-        $stmt->execute();
-        $stmt->close();
+        if ($stmt) {
+            $stmt->bind_param("ddddddis", $baseFare, $incKm, $perKm, $waitMin, $minFloor, $maxCeil, $isActive, $carLabel);
+            $stmt->execute();
+            $stmt->close();
+        }
     }
 }
 
