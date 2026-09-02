@@ -31,7 +31,7 @@ try {
 
     // ✅ Required fields
     $required_fields = [
-        'booking_number', 'phone_number', 'name', 'email', 'city',
+        'phone_number', 'name', 'email', 'city',
         'pincode', 'from_address', 'to_address', 'car_type', 'total_amount', 'distance'
     ];
 
@@ -43,8 +43,8 @@ try {
     }
 
     // ✅ Sanitize input
-    $booking_number = $conn->real_escape_string($data['booking_number']);
     $phone_number   = $conn->real_escape_string($data['phone_number']);
+    $booking_number = !empty($data['booking_number']) ? $conn->real_escape_string($data['booking_number']) : $phone_number;
     $name           = $conn->real_escape_string($data['name']);
     $email          = $conn->real_escape_string($data['email']);
     $city           = $conn->real_escape_string($data['city']);
