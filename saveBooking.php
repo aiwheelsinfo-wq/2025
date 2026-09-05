@@ -178,7 +178,17 @@ if (mysqli_num_rows($checkResult) > 0 ) {
 
 
 
-if($trip_type == 'One-way' && !empty($bookingId)){
+$existingBookingFound = false;
+if ($trip_type == 'One-way' && !empty($bookingId)) {
+    $escapedBookingId = mysqli_real_escape_string($conn, $bookingId);
+    $checkExistingSql = "SELECT id FROM bookings WHERE id = '$escapedBookingId' LIMIT 1";
+    $checkExistingResult = mysqli_query($conn, $checkExistingSql);
+    if ($checkExistingResult && mysqli_num_rows($checkExistingResult) > 0) {
+        $existingBookingFound = true;
+    }
+}
+
+if ($existingBookingFound) {
         
         
         $updateBookingSql = "UPDATE bookings SET 
