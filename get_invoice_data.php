@@ -67,7 +67,7 @@ if (!empty($data['driver_id'])) {
         $driver_res = $driver_stmt->get_result();
         if ($driver_res && $driver_row = $driver_res->fetch_assoc()) {
             $data['driver_name'] = $driver_row['full_name'] ?? '';
-            $data['driver_phone'] = $driver_row['phone_number'] ?? '';
+            $data['driver_phone'] = ''; // Driver phone hidden on invoices for privacy
             if (empty($data['vehicle_number']) && !empty($driver_row['rc_no'])) {
                 $data['vehicle_number'] = $driver_row['rc_no'];
             }
