@@ -48,6 +48,8 @@ $apiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM';
 
 $rawFromAddress = $_GET['fromAddress'] ?? $_GET['from_address'] ?? '';
 $rawToAddress   = $_GET['toAddress'] ?? $_GET['to_address'] ?? '';
+$fromAddress    = $rawFromAddress;
+$toAddress      = $rawToAddress;
 
 // 1. Direct explicit distance parameter passed by frontend
 if (isset($_GET['distance']) && floatval($_GET['distance']) > 0 && floatval($_GET['distance']) < 900) {

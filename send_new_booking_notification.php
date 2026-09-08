@@ -29,25 +29,25 @@ function getFcmAccessToken() {
 function sendSingleFcmNotification($accessToken, $projectId, $token, $notificationData) {
     $url = 'https://fcm.googleapis.com/v1/projects/' . $projectId . '/messages:send';
     
+    // High-Priority Data-Only Message (Uber/Ola Industry Standard)
+    // Trip alerts must NOT contain a top-level 'notification' block so Android/Google Play Services
+    // does not bypass the app and play hardcoded ringtones/vibrations at the OS system level.
+    // Instead, the app's Flutter background handler (_firebaseMessagingBackgroundHandler)
+    // executes and strictly respects the vendor/driver's Profile vibration and siren sound toggles.
     $messagePayload = [
         'message' => [
             'token' => $token,
-            'notification' => [
-                'title' => $notificationData['title'],
-                'body' => $notificationData['body'],
-            ],
             'data' => $notificationData['data'],
             'android' => [
-                'priority' => 'HIGH',
-                'notification' => [
-                    'channel_id' => 'rentox_ride_alert_channel',
-                    'sound' => 'preview',
-                    'notification_priority' => 'PRIORITY_MAX',
-                    'visibility' => 'PUBLIC',
-                    'default_vibrate_timings' => false,
-                    'vibrate_timings' => [
-                        '0.0s', '1.0s', '0.5s', '1.0s', '0.5s', '1.0s', '0.5s', '1.0s', '0.5s', '1.0s',
-                        '0.5s', '1.0s', '0.5s', '1.0s', '0.5s', '1.0s', '0.5s', '1.0s', '0.5s', '1.5s'
+                'priority' => 'HIGH'
+            ],
+            'apns' => [
+                'headers' => [
+                    'apns-priority' => '10'
+                ],
+                'payload' => [
+                    'aps' => [
+                        'content-available' => 1
                     ]
                 ]
             ]
@@ -127,16 +127,43 @@ if (!function_exists('get_vendor_free_capacity')) {
     }
 }
 
-function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon = null) {
+function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon = null, $is_emergency_retry = false) {
     global $conn; // Access the database connection from the parent scope
     
     if (empty($booking_id)) {
         error_log("Notification Error: Empty booking ID");
         return;
     }
+
+    // 0. Fetch dynamic alert settings from database
+    $alert_enabled = 1;
+    $ringtone_name = 'preview';
+    $vibration_duration_sec = 15;
+    $dialog_countdown_sec = 45;
+    $title_template = 'New Trip Available - {trip_type}';
+    $body_template = "From: {pickup_location}\nTo: {drop_location}\nEarnings: ₹{vendor_amount}";
+
+    $settings_res = mysqli_query($conn, "SELECT * FROM driver_alert_settings WHERE id = 1");
+    if ($settings_res && $settings_row = mysqli_fetch_assoc($settings_res)) {
+        $alert_enabled = intval($settings_row['alert_enabled'] ?? 1);
+        $ringtone_name = trim($settings_row['ringtone_name'] ?? 'preview');
+        $vibration_duration_sec = intval($settings_row['vibration_duration_sec'] ?? 15);
+        $dialog_countdown_sec = intval($settings_row['dialog_countdown_sec'] ?? 45);
+        if (!empty($settings_row['notification_title_template'])) {
+            $title_template = $settings_row['notification_title_template'];
+        }
+        if (!empty($settings_row['notification_body_template'])) {
+            $body_template = $settings_row['notification_body_template'];
+        }
+    }
+
+    if ($alert_enabled === 0) {
+        error_log("Notification Info: Driver ride alerts disabled by Admin in driver_alert_settings. Notification skipped for booking #$booking_id.");
+        return;
+    }
     
-    // 1. Fetch booking details
-    $stmt = $conn->prepare("SELECT id, trip_type, from_address, to_address, vendor_amount FROM bookings WHERE id = ?");
+    // 1. Fetch booking details (including date and time)
+    $stmt = $conn->prepare("SELECT id, trip_type, from_address, to_address, vendor_amount, date, time FROM bookings WHERE id = ?");
     if (!$stmt) {
         error_log("Notification DB Error: " . $conn->error);
         return;
@@ -158,6 +185,9 @@ function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon
     $pickup_location = $booking['from_address'] ?? '';
     $drop_location = $booking['to_address'] ?? '';
     $vendor_amount = $booking['vendor_amount'] ?? '0.00';
+    $booking_date = trim($booking['date'] ?? '');
+    $booking_time = trim($booking['time'] ?? '');
+
 
     // Geocode customer's pickup address using Google Geocoding API if coordinates are not provided
     if ($ref_lat === null || $ref_lon === null) {
@@ -254,26 +284,87 @@ function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon
         return;
     }
     
-    // 3. Prepare FCM message
+    // 3. Prepare FCM message with dynamic templates and alert settings
+    $is_advance_booking = (!empty($booking_date) && $booking_date > date('Y-m-d') && !$is_emergency_retry);
+
+    if ($is_advance_booking) {
+        // Calm Advance Booking notification (no urgent siren / 45s timer)
+        $formatted_date = date('d M Y', strtotime($booking_date));
+        $formatted_time = !empty($booking_time) ? date('h:i A', strtotime($booking_time)) : '';
+        $date_display = !empty($formatted_time) ? "$formatted_date at $formatted_time" : $formatted_date;
+        
+        $titleText = "📅 Advance Booking: $trip_type";
+        $bodyText = "Date: $date_display\nPickup: $pickup_location\nTo: " . (!empty($drop_location) ? $drop_location : 'As directed') . "\nEarnings: ₹" . number_format((float)$vendor_amount, 2) . "\nTap to view and claim in advance.";
+        
+        $channel_id = 'high_importance_channel';
+        $sound_for_fcm = 'default';
+        $vibrate_timings = ['0.0s', '0.4s', '0.2s', '0.4s'];
+        $effective_countdown = 0;
+    } else {
+        // Today's urgent ride OR emergency scheduled retry!
+        $replacements = [
+            '{trip_type}' => $trip_type,
+            '{pickup_location}' => $pickup_location,
+            '{drop_location}' => !empty($drop_location) ? $drop_location : 'As directed',
+            '{vendor_amount}' => number_format((float)$vendor_amount, 2),
+            '{booking_id}' => $booking_id_str
+        ];
+        $titleText = str_replace(array_keys($replacements), array_values($replacements), $title_template);
+        if ($is_emergency_retry) {
+            $titleText = "🚨 [URGENT TRIP] " . $titleText;
+        }
+        $bodyText = str_replace(array_keys($replacements), array_values($replacements), $body_template);
+        $bodyText = str_replace(['\\r\\n', '\\n', '\\r'], "\n", $bodyText);
+
+        // Build dynamic FCM vibration timings array for Android
+        $vibrate_timings = ['0.0s'];
+        $elapsed = 0.0;
+        while ($elapsed < $vibration_duration_sec) {
+            $vibrate_timings[] = '1.0s';
+            $vibrate_timings[] = '0.5s';
+            $elapsed += 1.5;
+        }
+
+        // Map to guaranteed registered notification channels in Android
+        if ($ringtone_name === 'loud_alarm') {
+            $channel_id = 'rentox_alert_loud_alarm';
+        } elseif ($ringtone_name === 'uber_pulse') {
+            $channel_id = 'rentox_alert_uber_pulse';
+        } elseif ($ringtone_name === 'default') {
+            $channel_id = 'high_importance_channel';
+        } else {
+            $channel_id = 'rentox_ride_alert_channel';
+        }
+        $sound_for_fcm = $ringtone_name;
+        $effective_countdown = $dialog_countdown_sec;
+    }
+
     $keyFileContent = json_decode(file_get_contents(__DIR__ . '/agni-car-app-firebase-adminsdk-fbsvc-4f70f7d1f2.json'), true);
     $projectId = $keyFileContent['project_id'] ?? 'agnicarrentaldriver-8fb07';
-    
-    $bodyText = "From: " . $pickup_location;
-    if (!empty($drop_location)) {
-        $bodyText .= "\nTo: " . $drop_location;
-    }
-    $bodyText .= "\nEarnings: ₹" . number_format((float)$vendor_amount, 2);
 
     $notificationData = [
-        'title' => 'New Trip Available - ' . $trip_type,
+        'title' => $titleText,
         'body' => $bodyText,
+        'channel_id' => $channel_id,
+        'sound' => $sound_for_fcm,
+        'vibrate_timings' => $vibrate_timings,
         'data' => [
+            'title' => $titleText,
+            'body' => $bodyText,
             'booking_id' => $booking_id_str,
             'booking_type' => $trip_type,
             'pickup_location' => $pickup_location,
             'drop_location' => $drop_location,
             'vendor_amount' => (string)$vendor_amount,
-            'notification_type' => 'new_booking'
+            'countdown_seconds' => (string)$effective_countdown,
+            'vibrate_seconds' => $is_advance_booking ? '1' : (string)$vibration_duration_sec,
+            'ringtone_name' => $sound_for_fcm,
+            'channel_id' => $channel_id,
+            'notification_type' => 'new_booking',
+            'is_advance_booking' => $is_advance_booking ? 'true' : 'false',
+            'is_emergency_retry' => $is_emergency_retry ? 'true' : 'false',
+            'booking_date' => $booking_date,
+            'booking_time' => $booking_time
         ]
     ];
     
