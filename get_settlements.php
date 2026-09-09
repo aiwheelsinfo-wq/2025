@@ -14,6 +14,7 @@ $stmt = $conn->prepare("
     SELECT 
         id AS booking_id,
         paid_amount,
+        total_amount,
         booking_status,
         settlement_status,
         settlement_date,
@@ -66,7 +67,19 @@ while ($row = $result->fetch_assoc()) {
             if ($eligible < 0) $eligible = 0; // Guard against negative values
         } else {
             // For One-way:
-            $eligible = $advance * 0.60;
+            // Driver collects remaining balance = (total_amount * 1.05) - advance from customer (including 5% GST)
+            // Company holds the advance. Company settles: vendor_amount - remaining_collected_by_driver
+            $total_amount = floatval($row['total_amount'] ?? 0);
+            if ($total_amount == 0 && !empty($row['base_charge'])) {
+                $total_amount = floatval($row['base_charge']);
+            }
+            $vendor_amount = floatval($row['vendor_amount'] ?? 0);
+            if ($vendor_amount == 0 && $total_amount > 0) {
+                $vendor_amount = $total_amount * 0.90;
+            }
+            $total_with_gst = $total_amount * 1.05;
+            $remaining_collect = max(0, $total_with_gst - $advance);
+            $eligible = max(0, $vendor_amount - $remaining_collect);
         }
         $settlement_status = $row['settlement_status'] ?: 'Pending';
         // completion date defaults to closing_date if set, else travel date

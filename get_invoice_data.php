@@ -156,6 +156,12 @@ if ($tripType === 'One-way') {
         $data['extraHoursAmount'] = $finalCostRow['extraHoursAmount'];
         $data['packageKm']        = $finalCostRow['packageKm'];
         $data['packageHours']     = $finalCostRow['packageHours'];
+        // Cross-platform field aliases
+        $data['packageBaseFare']   = $finalCostRow['baseAmount'];
+        $data['extra_km_price']    = $finalCostRow['extraKMAmount'];
+        $data['extra_hours_price'] = $finalCostRow['extraHoursAmount'];
+        $data['package_km']        = $finalCostRow['packageKm'];
+        $data['package_hours']     = $finalCostRow['packageHours'];
         $data['gstPercent']       = $finalCostRow['gstPercent'];
         $data['driver_allowance']  = $finalCostRow['driver_allowance'];
         $data['daily_limit']       = $finalCostRow['daily_limit'];
