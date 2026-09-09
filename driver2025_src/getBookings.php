@@ -12,6 +12,53 @@ try {
         throw new Exception("Database connection failed.");
     }
 
+    // Check if requesting partner/driver is blocked (check both drivers and vendors tables)
+    if (!empty($vendor_phone)) {
+        $chkStmt = $conn->prepare("SELECT status, block_reason FROM drivers WHERE phone_number = ? LIMIT 1");
+        if ($chkStmt) {
+            $chkStmt->bind_param("s", $vendor_phone);
+            $chkStmt->execute();
+            $chkStmt->bind_result($vStatus, $vReason);
+            if ($chkStmt->fetch()) {
+                if (strtolower(trim($vStatus ?? '')) === 'blocked') {
+                    $chkStmt->close();
+                    echo json_encode([
+                        "status" => "blocked",
+                        "is_blocked" => true,
+                        "block_reason" => !empty($vReason) ? $vReason : "Administrative restriction",
+                        "message" => "Your partner account has been suspended/blocked. Reason: " . (!empty($vReason) ? $vReason : "Administrative restriction") . ". Please contact support.",
+                        "bookings" => [],
+                        "acceptedBookings" => []
+                    ]);
+                    exit;
+                }
+            }
+            $chkStmt->close();
+        }
+
+        $vChkStmt = $conn->prepare("SELECT status, block_reason FROM vendors WHERE phone_number = ? LIMIT 1");
+        if ($vChkStmt) {
+            $vChkStmt->bind_param("s", $vendor_phone);
+            $vChkStmt->execute();
+            $vChkStmt->bind_result($vndStatus, $vndReason);
+            if ($vChkStmt->fetch()) {
+                if (strtolower(trim($vndStatus ?? '')) === 'blocked') {
+                    $vChkStmt->close();
+                    echo json_encode([
+                        "status" => "blocked",
+                        "is_blocked" => true,
+                        "block_reason" => !empty($vndReason) ? $vndReason : "Administrative restriction",
+                        "message" => "Your partner account has been suspended/blocked. Reason: " . (!empty($vndReason) ? $vndReason : "Administrative restriction") . ". Please contact support.",
+                        "bookings" => [],
+                        "acceptedBookings" => []
+                    ]);
+                    exit;
+                }
+            }
+            $vChkStmt->close();
+        }
+    }
+
     $driver_lat = null;
     $driver_lon = null;
     if (!empty($driver_phone)) {

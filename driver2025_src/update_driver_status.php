@@ -24,17 +24,30 @@ if (empty($phone_number)) {
 
 // GET: Fetch current online/offline status
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $stmt = $conn->prepare("SELECT status FROM drivers WHERE phone_number = ? LIMIT 1");
+    $stmt = $conn->prepare("SELECT status, block_reason FROM drivers WHERE phone_number = ? LIMIT 1");
     if ($stmt) {
         $stmt->bind_param("s", $phone_number);
         $stmt->execute();
         $res = $stmt->get_result();
         if ($row = $res->fetch_assoc()) {
             $driver_status = trim($row['status'] ?? 'active');
+            if (strtolower($driver_status) === 'blocked') {
+                echo json_encode([
+                    'status' => 'blocked',
+                    'is_online' => false,
+                    'is_blocked' => true,
+                    'driver_status' => 'blocked',
+                    'block_reason' => $row['block_reason'] ?? 'Administrative restriction',
+                    'message' => 'Partner account is blocked. Reason: ' . ($row['block_reason'] ?? 'Administrative restriction')
+                ]);
+                $stmt->close();
+                exit;
+            }
             $is_online = ($driver_status === 'active');
             echo json_encode([
                 'status' => 'success',
                 'is_online' => $is_online,
+                'is_blocked' => false,
                 'driver_status' => $driver_status
             ]);
             $stmt->close();
@@ -46,12 +59,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     echo json_encode([
         'status' => 'success',
         'is_online' => true,
+        'is_blocked' => false,
         'driver_status' => 'active'
     ]);
     exit;
 }
 
 // POST: Update status ('active' for online, 'offline' for offline)
+// Check if currently blocked in database
+$chk = $conn->prepare("SELECT status, block_reason FROM drivers WHERE phone_number = ? LIMIT 1");
+if ($chk) {
+    $chk->bind_param("s", $phone_number);
+    $chk->execute();
+    $res = $chk->get_result();
+    if ($r = $res->fetch_assoc()) {
+        if (strtolower(trim($r['status'] ?? '')) === 'blocked') {
+            $chk->close();
+            echo json_encode([
+                'status' => 'blocked',
+                'is_online' => false,
+                'is_blocked' => true,
+                'driver_status' => 'blocked',
+                'block_reason' => $r['block_reason'] ?? 'Administrative restriction',
+                'message' => 'Account is blocked. You cannot go online. Reason: ' . ($r['block_reason'] ?? 'Administrative restriction')
+            ]);
+            exit;
+        }
+    }
+    $chk->close();
+}
+
 $new_status = trim($_POST['status'] ?? '');
 if (empty($new_status)) {
     // If passed as boolean is_online

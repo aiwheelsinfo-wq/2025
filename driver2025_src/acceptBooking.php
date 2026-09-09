@@ -23,6 +23,56 @@ if (empty($driver_id)) {
     $driver_id = $vendor_id;
 }
 
+// Check if vendor or assigned driver is blocked in drivers or vendors table
+$chk_phones = array_unique(array_filter([$vendor_id, $driver_id]));
+foreach ($chk_phones as $phone_to_check) {
+    error_log("Checking block status for phone: $phone_to_check");
+    // 1. Check drivers table
+    $blk_stmt = $conn->prepare("SELECT status, block_reason FROM drivers WHERE phone_number = ? LIMIT 1");
+    if ($blk_stmt) {
+        $blk_stmt->bind_param("s", $phone_to_check);
+        $blk_stmt->execute();
+        $blk_stmt->bind_result($bStatus, $bReason);
+        if ($blk_stmt->fetch()) {
+            error_log("Found in drivers: status=$bStatus, reason=$bReason");
+            if (strtolower(trim($bStatus ?? '')) === 'blocked') {
+                $blk_stmt->close();
+                $reason = !empty($bReason) ? $bReason : "Administrative restriction";
+                echo json_encode([
+                    "success" => false,
+                    "status" => "blocked",
+                    "message" => "Account Blocked: You cannot accept bookings. Reason: $reason. Please contact support."
+                ]);
+                exit;
+            }
+        } else {
+            error_log("Not found in drivers: $phone_to_check");
+        }
+        $blk_stmt->close();
+    }
+
+    // 2. Check vendors table
+    $vblk_stmt = $conn->prepare("SELECT status, block_reason FROM vendors WHERE phone_number = ? LIMIT 1");
+    if ($vblk_stmt) {
+        $vblk_stmt->bind_param("s", $phone_to_check);
+        $vblk_stmt->execute();
+        $vblk_stmt->bind_result($vbStatus, $vbReason);
+        if ($vblk_stmt->fetch()) {
+            if (strtolower(trim($vbStatus ?? '')) === 'blocked') {
+                $vblk_stmt->close();
+                $reason = !empty($vbReason) ? $vbReason : "Administrative restriction";
+                echo json_encode([
+                    "success" => false,
+                    "status" => "blocked",
+                    "message" => "Account Blocked: You cannot accept bookings. Reason: $reason. Please contact support."
+                ]);
+                exit;
+            }
+        }
+        $vblk_stmt->close();
+    }
+}
+
 // Start transaction
 $conn->begin_transaction();
 
