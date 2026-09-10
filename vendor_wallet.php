@@ -71,6 +71,7 @@ function getLocalTaxiSettings($conn) {
 // Helper: Fetch vendor current wallet balance
 function getVendorWalletBalance($conn, $phone) {
     $phone = trim($phone);
+    $bal = 0.00;
     $stmt = $conn->prepare("SELECT wallet_balance FROM drivers WHERE phone_number = ? LIMIT 1");
     if ($stmt) {
         $stmt->bind_param("s", $phone);
@@ -83,6 +84,7 @@ function getVendorWalletBalance($conn, $phone) {
         $stmt->close();
     }
 
+    $vbal = 0.00;
     $vstmt = $conn->prepare("SELECT wallet_balance FROM vendors WHERE phone_number = ? LIMIT 1");
     if ($vstmt) {
         $vstmt->bind_param("s", $phone);
@@ -168,7 +170,8 @@ switch ($action) {
             if ($chkDup) {
                 $chkDup->bind_param("s", $payment_id);
                 $chkDup->execute();
-                if ($chkDup->fetch()) {
+                $chkDup->store_result();
+                if ($chkDup->num_rows > 0) {
                     $chkDup->close();
                     $bal = getVendorWalletBalance($conn, $phone);
                     echo json_encode(["status" => "success", "message" => "Payment already credited.", "wallet_balance" => $bal]);

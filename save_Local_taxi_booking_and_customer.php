@@ -139,8 +139,8 @@ try {
     // ✅ Determine booking status
     $booking_status = "Pending";
 
-    $current_date = date('Y-m-d');
-    $current_time = date('H:i:s');
+    $current_date = !empty($data['pickup_date']) ? $conn->real_escape_string($data['pickup_date']) : (!empty($data['date']) ? $conn->real_escape_string($data['date']) : date('Y-m-d'));
+    $current_time = !empty($data['pickup_time']) ? $conn->real_escape_string($data['pickup_time']) : (!empty($data['time']) ? $conn->real_escape_string($data['time']) : date('H:i:s'));
     $created_at   = date('Y-m-d H:i:s');
 
     // ✅ Begin transaction

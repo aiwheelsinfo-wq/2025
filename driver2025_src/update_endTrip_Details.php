@@ -61,7 +61,7 @@ if ($result && $row = $result->fetch_assoc()) {
 $invoice_date = date('Y-m-d'); 
 
 // Validation
-if($trip_type == 'Round-Trip' || $trip_type == 'Local-Duty' ){
+if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Local-Duty') === 0) {
     // Prepare and bind - updated to support agent_commission
     $stmt = $conn->prepare("UPDATE bookings SET booking_status = ?, closing_km = ?, closing_date = ?, closing_time = ?, total_amount = ?, vendor_amount = ?, agni_amount = ?, agent_commission = ?, invoice_no = ?, invoice_date = ?, toll_charge=?, parking_charge=?, permit_charge =? WHERE id = ?");
     $stmt->bind_param("sissddddssddds", $status, $closing_km, $closing_date, $closing_time, $total_amount, $vendor_amount, $agni_amount, $agent_commission, $next_invoice_no, $invoice_date, $toll_charge, $parking_charge, $permit_charge, $booking_id);
@@ -87,9 +87,7 @@ if($trip_type == 'Round-Trip' || $trip_type == 'Local-Duty' ){
             'error' => $stmt->error
         ]);
     }
-}
-
-if($trip_type == 'One-way' ){
+} else if (strcasecmp($trip_type, 'One-way') === 0) {
     // Prepare and bind
     $stmt = $conn->prepare("UPDATE bookings SET booking_status = ?, closing_km = ?, closing_date = ?, closing_time = ? ,invoice_no = ?, invoice_date = ?, toll_charge = ?, parking_charge =? , permit_charge =?, total_amount = ?, vendor_amount =?, agni_amount =? ,base_charge=? WHERE id = ?");
     $stmt->bind_param("sissssddddddss", $status, $closing_km, $closing_date, $closing_time,$next_invoice_no , $invoice_date, $toll_charge, $parking_charge, $permit_charge, $total_amount, $vendor_amount, $agni_amount, $base_charge,$booking_id);
@@ -115,9 +113,7 @@ if($trip_type == 'One-way' ){
             'error' => $stmt->error
         ]);
     }
-}
-
-if ($trip_type == 'Local-taxi' || stripos($trip_type, 'local') !== false) {
+} else if (strcasecmp($trip_type, 'Local-taxi') === 0 || strcasecmp($trip_type, 'Local taxi') === 0) {
     // 1. Fetch dynamic commission percentage from local_taxi_global_settings
     $companySharePercent = 10.00;
     $gStmt = $conn->query("SELECT company_share_value, company_share_active FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
@@ -140,9 +136,9 @@ if ($trip_type == 'Local-taxi' || stripos($trip_type, 'local') !== false) {
     if ($stmt->execute()) {
         // 3. Deduct commission from Vendor Prepaid Wallet
         $vPhone = '';
-        $bQ = $conn->query("SELECT vendor_id, driver_id FROM bookings WHERE id = '" . mysqli_real_escape_string($conn, $booking_id) . "' LIMIT 1");
+        $bQ = $conn->query("SELECT vender_id, driver_id FROM bookings WHERE id = '" . mysqli_real_escape_string($conn, $booking_id) . "' LIMIT 1");
         if ($bQ && $brow = $bQ->fetch_assoc()) {
-            $vPhone = !empty($brow['vendor_id']) ? $brow['vendor_id'] : ($brow['driver_id'] ?? '');
+            $vPhone = !empty($brow['vender_id']) ? $brow['vender_id'] : ($brow['driver_id'] ?? '');
         }
 
         if (!empty($vPhone) && $commissionAmount > 0) {
@@ -163,7 +159,8 @@ if ($trip_type == 'Local-taxi' || stripos($trip_type, 'local') !== false) {
             $tType = 'trip_commission_deduct';
             $logStmt = $conn->prepare("INSERT INTO vendor_wallet_transactions (vendor_phone, booking_id, transaction_type, amount, balance_before, balance_after, description) VALUES (?, ?, ?, ?, ?, ?, ?)");
             if ($logStmt) {
-                $logStmt->bind_param("sisddds", $vPhone, $booking_id, $tType, $commissionAmount, $balBefore, $balAfter, $desc);
+                $bIdInt = (int)$booking_id;
+                $logStmt->bind_param("sisddds", $vPhone, $bIdInt, $tType, $commissionAmount, $balBefore, $balAfter, $desc);
                 $logStmt->execute();
                 $logStmt->close();
             }
@@ -193,6 +190,11 @@ if ($trip_type == 'Local-taxi' || stripos($trip_type, 'local') !== false) {
             'error' => $stmt->error
         ]);
     }
+} else {
+    echo json_encode([
+        'success' => false,
+        'message' => 'Invalid or unsupported trip type: ' . $trip_type
+    ]);
 }
 
 if (isset($stmt) && $stmt) {
