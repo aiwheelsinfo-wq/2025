@@ -117,13 +117,58 @@ if($trip_type == 'One-way' ){
     }
 }
 
-if( $trip_type == 'Local-taxi'){
-    // Prepare and bind
-    $stmt = $conn->prepare("UPDATE bookings SET booking_status = ?, closing_km = ?, closing_date = ?, closing_time = ?, total_amount = ?, vendor_amount = ?,invoice_no = ?, invoice_date = ?, toll_charge =?, parking_charge =?, permit_charge =? WHERE id = ?");
-    $stmt->bind_param("sissddssddds", $status, $closing_km, $closing_date, $closing_time, $total_amount, $vendor_amount,$next_invoice_no, $invoice_date, $toll_charge, $parking_charge, $permit_charge,  $booking_id);
+if ($trip_type == 'Local-taxi' || stripos($trip_type, 'local') !== false) {
+    // 1. Fetch dynamic commission percentage from local_taxi_global_settings
+    $companySharePercent = 10.00;
+    $gStmt = $conn->query("SELECT company_share_value, company_share_active FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+    if ($gStmt && $gRow = $gStmt->fetch_assoc()) {
+        if (!empty($gRow['company_share_active'])) {
+            $companySharePercent = (float)($gRow['company_share_value'] ?? 10.00);
+        }
+    }
+
+    // 2. Calculate dynamic commission amount
+    $commissionAmount = round(($total_amount * ($companySharePercent / 100.0)), 2);
+    $agni_amount = $commissionAmount;
+    $vendor_amount = max(0, $total_amount - $commissionAmount);
+
+    // Prepare and bind - update total_amount, vendor_amount, and agni_amount
+    $stmt = $conn->prepare("UPDATE bookings SET booking_status = ?, closing_km = ?, closing_date = ?, closing_time = ?, total_amount = ?, vendor_amount = ?, agni_amount = ?, invoice_no = ?, invoice_date = ?, toll_charge =?, parking_charge =?, permit_charge =? WHERE id = ?");
+    $stmt->bind_param("sissdddssddds", $status, $closing_km, $closing_date, $closing_time, $total_amount, $vendor_amount, $agni_amount, $next_invoice_no, $invoice_date, $toll_charge, $parking_charge, $permit_charge, $booking_id);
 
     // Execute
     if ($stmt->execute()) {
+        // 3. Deduct commission from Vendor Prepaid Wallet
+        $vPhone = '';
+        $bQ = $conn->query("SELECT vendor_id, driver_id FROM bookings WHERE id = '" . mysqli_real_escape_string($conn, $booking_id) . "' LIMIT 1");
+        if ($bQ && $brow = $bQ->fetch_assoc()) {
+            $vPhone = !empty($brow['vendor_id']) ? $brow['vendor_id'] : ($brow['driver_id'] ?? '');
+        }
+
+        if (!empty($vPhone) && $commissionAmount > 0) {
+            $balBefore = 0.00;
+            $wQ = $conn->query("SELECT wallet_balance FROM drivers WHERE phone_number = '" . mysqli_real_escape_string($conn, $vPhone) . "' LIMIT 1");
+            if ($wQ && $wrow = $wQ->fetch_assoc()) {
+                $balBefore = (float)$wrow['wallet_balance'];
+            }
+            $balAfter = $balBefore - $commissionAmount;
+
+            // Deduct from drivers and vendors
+            $safePhone = mysqli_real_escape_string($conn, $vPhone);
+            $conn->query("UPDATE drivers SET wallet_balance = wallet_balance - $commissionAmount WHERE phone_number = '$safePhone'");
+            $conn->query("UPDATE vendors SET wallet_balance = wallet_balance - $commissionAmount WHERE phone_number = '$safePhone'");
+
+            // Record transaction ledger
+            $desc = "Commission (" . number_format($companySharePercent, 1) . "%) for Local Taxi Trip #" . $booking_id;
+            $tType = 'trip_commission_deduct';
+            $logStmt = $conn->prepare("INSERT INTO vendor_wallet_transactions (vendor_phone, booking_id, transaction_type, amount, balance_before, balance_after, description) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            if ($logStmt) {
+                $logStmt->bind_param("sisddds", $vPhone, $booking_id, $tType, $commissionAmount, $balBefore, $balAfter, $desc);
+                $logStmt->execute();
+                $logStmt->close();
+            }
+        }
+
         preg_match('/\d+/', $next_invoice_no, $matches);
         $current_number = isset($matches[0]) ? (int)$matches[0] : 0;
         $prefix = preg_replace('/\d/', '', $next_invoice_no);
@@ -135,7 +180,12 @@ if( $trip_type == 'Local-taxi'){
         $update_stmt->execute();
         $update_stmt->close();
 
-        echo json_encode(['success' => true, 'message' => 'Booking updated successfully']);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Booking updated successfully',
+            'commission_deducted' => $commissionAmount,
+            'commission_percent' => $companySharePercent
+        ]);
     } else {
         echo json_encode([
             'success' => false,

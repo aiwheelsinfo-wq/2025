@@ -101,8 +101,40 @@ try {
         exit;
     }
 
-    // Check for 5 km radius limit on Local-taxi bookings
+    // Check for 5 km radius limit and wallet balance on Local-taxi bookings
     if (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false) {
+        // A. Wallet Balance Check for Local Taxi rides
+        $minWalletBalance = 0.00;
+        $setStmt = $conn->query("SELECT min_wallet_balance FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+        if ($setStmt && $sRow = $setStmt->fetch_assoc()) {
+            $minWalletBalance = (float)($sRow['min_wallet_balance'] ?? 0.00);
+        }
+
+        // Check wallet balance of vendor/driver
+        $vendorWalletBal = 0.00;
+        $wStmt = $conn->prepare("SELECT wallet_balance FROM drivers WHERE phone_number = ? LIMIT 1");
+        if ($wStmt) {
+            $wStmt->bind_param("s", $vendor_id);
+            $wStmt->execute();
+            $wStmt->bind_result($wbal);
+            if ($wStmt->fetch()) {
+                $vendorWalletBal = (float)$wbal;
+            }
+            $wStmt->close();
+        }
+
+        if ($vendorWalletBal <= $minWalletBalance) {
+            $conn->rollback();
+            echo json_encode([
+                "success" => false,
+                "status" => "low_wallet_balance",
+                "wallet_balance" => $vendorWalletBal,
+                "min_required" => $minWalletBalance,
+                "message" => "Insufficient wallet balance (₹" . number_format($vendorWalletBal, 2) . "). Please recharge your wallet to accept Local Taxi rides."
+            ]);
+            exit;
+        }
+
         // 1. Get driver's location
         $driver_lat = null;
         $driver_lng = null;

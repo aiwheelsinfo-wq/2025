@@ -325,8 +325,31 @@ try {
     $stmtPending->close();
 
     // ===================== Final Response =====================
+    $vPhone = !empty($vendor_phone) ? $vendor_phone : $driver_phone;
+    $wallet_balance = 0.00;
+    if (!empty($vPhone)) {
+        $wStmt = $conn->prepare("SELECT wallet_balance FROM drivers WHERE phone_number = ? LIMIT 1");
+        if ($wStmt) {
+            $wStmt->bind_param("s", $vPhone);
+            $wStmt->execute();
+            $wStmt->bind_result($wb);
+            if ($wStmt->fetch()) {
+                $wallet_balance = (float)$wb;
+            }
+            $wStmt->close();
+        }
+    }
+    $min_wallet_balance = 0.00;
+    $mwQ = $conn->query("SELECT min_wallet_balance FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+    if ($mwQ && $mwR = $mwQ->fetch_assoc()) {
+        $min_wallet_balance = (float)($mwR['min_wallet_balance'] ?? 0.00);
+    }
+
     $response = [
         "success" => true,
+        "wallet_balance" => $wallet_balance,
+        "min_wallet_balance" => $min_wallet_balance,
+        "is_eligible_for_local_taxi" => ($wallet_balance > $min_wallet_balance),
         "acceptedBookings" => $acceptedBookings,
         "bookings" => $bookings
     ];
