@@ -1,5 +1,7 @@
 <?php
 header("Content-Type: text/plain");
+echo "Configuring git safe directory...\n";
+echo shell_exec("git config --global --add safe.directory /var/www/html/2025 2>&1");
 echo "Fetching latest from origin...\n";
 echo shell_exec("git fetch origin 2>&1");
 echo "Force resetting to origin/main...\n";

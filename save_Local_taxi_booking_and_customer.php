@@ -213,10 +213,23 @@ try {
         $user_stmt->close();
     }
 
-    // For Local Taxi bookings, the Vendor Earnings must be exactly equal to the Customer Paid Amount.
-    // Vendor receives 100% of the booking amount. No Agni commission or platform fee is deducted.
-    $agni_amount = 0;
-    $vendor_amount = $total_amount;
+    // Calculate Local Taxi Company Commission dynamically from settings
+    $agni_amount = 0.00;
+    $commRes = $conn->query("SELECT company_share_active, company_share_type, company_share_value FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+    if ($commRes && $commRow = $commRes->fetch_assoc()) {
+        if (!empty($commRow['company_share_active'])) {
+            $cType = $commRow['company_share_type'] ?? 'percent';
+            $cVal = (float)($commRow['company_share_value'] ?? 10.00);
+            if ($cType === 'flat') {
+                $agni_amount = round(min($total_amount, $cVal), 2);
+            } else {
+                $agni_amount = round($total_amount * ($cVal / 100.0), 2);
+            }
+        }
+    } else {
+        $agni_amount = round($total_amount * 0.10, 2);
+    }
+    $vendor_amount = max(0.00, round($total_amount - $agni_amount, 2));
 
     // ✅ Insert booking
     $booking_sql = "INSERT INTO bookings (
