@@ -117,7 +117,7 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Local-
     // Check vehicle rule override
     if (!empty($carType)) {
         $safeCar = mysqli_real_escape_string($conn, $carType);
-        $vRuleQ = $conn->query("SELECT company_share_percent FROM one_way_vehicle_rules WHERE category_name = '$safeCar' LIMIT 1");
+        $vRuleQ = $conn->query("SELECT company_share_percent FROM one_way_vehicle_rules WHERE car_type_label = '$safeCar' OR car_type_id = '$safeCar' LIMIT 1");
         if ($vRuleQ && $vRow = $vRuleQ->fetch_assoc()) {
             $vehOverride = floatval($vRow['company_share_percent'] ?? 0.0);
             if ($vehOverride > 0) {
