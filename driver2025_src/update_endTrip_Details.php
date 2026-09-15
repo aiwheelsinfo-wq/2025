@@ -127,10 +127,10 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Local-
         }
     }
 
-    // 3. Calculate dynamic commission amount
+    // 3. Calculate dynamic commission amount + 5% GST
+    $basisAmount = ($companyShareBasis === 'base_km' && $base_charge > 0) ? $base_charge : $total_amount;
     $commissionAmount = 0.00;
     if ($companyShareActive) {
-        $basisAmount = ($companyShareBasis === 'base_km' && $base_charge > 0) ? $base_charge : $total_amount;
         if ($companyShareType === 'fixed') {
             $commissionAmount = round(min($basisAmount, $companyShareValue), 2);
         } else {
@@ -138,11 +138,14 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Local-
         }
     }
 
+    $gstAmount = round($basisAmount * 0.05, 2);
+    $totalDeductionAmount = round($commissionAmount + $gstAmount, 2);
+
     if ($agni_amount === null || $agni_amount <= 0) {
-        $agni_amount = $commissionAmount;
+        $agni_amount = $totalDeductionAmount;
     }
     if ($vendor_amount === null || $vendor_amount <= 0) {
-        $vendor_amount = max(0, $total_amount - $agni_amount);
+        $vendor_amount = max(0, $basisAmount - $commissionAmount);
     }
 
     // Prepare and bind
@@ -151,14 +154,14 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Local-
 
     // Execute
     if ($stmt->execute()) {
-        // 4. Deduct commission from Vendor/Driver Prepaid Wallet
+        // 4. Deduct commission and GST from Vendor/Driver Prepaid Wallet
         $vPhone = '';
         $bQ = $conn->query("SELECT vender_id, driver_id FROM bookings WHERE id = '" . mysqli_real_escape_string($conn, $booking_id) . "' LIMIT 1");
         if ($bQ && $brow = $bQ->fetch_assoc()) {
             $vPhone = !empty($brow['vender_id']) ? $brow['vender_id'] : ($brow['driver_id'] ?? '');
         }
 
-        if (!empty($vPhone) && $commissionAmount > 0) {
+        if (!empty($vPhone) && $totalDeductionAmount > 0) {
             $balBefore = 0.00;
             $wQ = $conn->query("SELECT wallet_balance FROM drivers WHERE phone_number = '" . mysqli_real_escape_string($conn, $vPhone) . "' LIMIT 1");
             if ($wQ && $wrow = $wQ->fetch_assoc()) {
@@ -169,21 +172,21 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Local-
                     $balBefore = (float)$vwrow['wallet_balance'];
                 }
             }
-            $balAfter = $balBefore - $commissionAmount;
+            $balAfter = $balBefore - $totalDeductionAmount;
 
             // Deduct from drivers and vendors
             $safePhone = mysqli_real_escape_string($conn, $vPhone);
-            $conn->query("UPDATE drivers SET wallet_balance = wallet_balance - $commissionAmount WHERE phone_number = '$safePhone'");
-            $conn->query("UPDATE vendors SET wallet_balance = wallet_balance - $commissionAmount WHERE phone_number = '$safePhone'");
+            $conn->query("UPDATE drivers SET wallet_balance = wallet_balance - $totalDeductionAmount WHERE phone_number = '$safePhone'");
+            $conn->query("UPDATE vendors SET wallet_balance = wallet_balance - $totalDeductionAmount WHERE phone_number = '$safePhone'");
 
             // Record transaction ledger
             $shareDesc = ($companyShareType === 'fixed') ? "₹" . number_format($companyShareValue, 2) : number_format($companyShareValue, 1) . "%";
-            $desc = "Commission (" . $shareDesc . ") for One-Way Trip #" . $booking_id;
+            $desc = "Platform Commission (" . $shareDesc . ": ₹" . number_format($commissionAmount, 0) . ") + 5% GST (₹" . number_format($gstAmount, 0) . ") for One-Way Trip #" . $booking_id;
             $tType = 'trip_commission_deduct';
             $logStmt = $conn->prepare("INSERT INTO vendor_wallet_transactions (vendor_phone, booking_id, transaction_type, amount, balance_before, balance_after, description) VALUES (?, ?, ?, ?, ?, ?, ?)");
             if ($logStmt) {
                 $bIdInt = (int)$booking_id;
-                $logStmt->bind_param("sisddds", $vPhone, $bIdInt, $tType, $commissionAmount, $balBefore, $balAfter, $desc);
+                $logStmt->bind_param("sisddds", $vPhone, $bIdInt, $tType, $totalDeductionAmount, $balBefore, $balAfter, $desc);
                 $logStmt->execute();
                 $logStmt->close();
             }
