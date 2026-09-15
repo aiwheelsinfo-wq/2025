@@ -128,7 +128,8 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Local-
     }
 
     // 3. Calculate dynamic commission amount + 5% GST
-    $basisAmount = ($companyShareBasis === 'base_km' && $base_charge > 0) ? $base_charge : $total_amount;
+    $basisAmount = ($total_amount > 0) ? $total_amount : (($base_charge > 0) ? $base_charge : 0);
+    $base_charge = $basisAmount;
     $commissionAmount = 0.00;
     if ($companyShareActive) {
         if ($companyShareType === 'fixed') {
