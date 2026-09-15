@@ -20,8 +20,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         exit;
     }
 
-    // 1️⃣ Get the date of the selected booking
-    $sqlDate = "SELECT date FROM bookings WHERE id = ?";
+    // 1️⃣ Get the date and trip_type of the selected booking
+    $sqlDate = "SELECT date, trip_type FROM bookings WHERE id = ?";
     $stmt = $conn->prepare($sqlDate);
     $stmt->bind_param("i", $booking_id);
     $stmt->execute();
@@ -35,6 +35,61 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 
     $selectedBookingDate = $bookingRow['date'];
+    $trip_type = $bookingRow['trip_type'] ?? '';
+
+    // 🔒 Wallet Balance Validation for Local Taxi and One-Way rides
+    if (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false || stripos($trip_type, 'One-way') !== false || stripos($trip_type, 'One-Way') !== false) {
+        $minWalletBalance = 0.00;
+        
+        if (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false) {
+            $setStmt = $conn->query("SELECT min_wallet_balance FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+            if ($setStmt && $sRow = $setStmt->fetch_assoc()) {
+                $minWalletBalance = (float)($sRow['min_wallet_balance'] ?? 0.00);
+            }
+        } else {
+            $setStmt = $conn->query("SELECT min_wallet_balance FROM one_way_global_settings WHERE id = 1 LIMIT 1");
+            if ($setStmt && $sRow = $setStmt->fetch_assoc()) {
+                $minWalletBalance = (float)($sRow['min_wallet_balance'] ?? 0.00);
+            }
+        }
+
+        $vendorWalletBal = 0.00;
+        $wStmt = $conn->prepare("SELECT wallet_balance FROM drivers WHERE phone_number = ? LIMIT 1");
+        if ($wStmt) {
+            $wStmt->bind_param("s", $vender_id);
+            $wStmt->execute();
+            $wStmt->bind_result($wbal);
+            if ($wStmt->fetch()) {
+                $vendorWalletBal = (float)$wbal;
+            }
+            $wStmt->close();
+        }
+
+        if ($vendorWalletBal <= 0) {
+            $vwStmt = $conn->prepare("SELECT wallet_balance FROM vendors WHERE phone_number = ? LIMIT 1");
+            if ($vwStmt) {
+                $vwStmt->bind_param("s", $vender_id);
+                $vwStmt->execute();
+                $vwStmt->bind_result($vwbal);
+                if ($vwStmt->fetch() && (float)$vwbal > 0) {
+                    $vendorWalletBal = (float)$vwbal;
+                }
+                $vwStmt->close();
+            }
+        }
+
+        if ($vendorWalletBal <= $minWalletBalance) {
+            $rideTypeLabel = (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false) ? "Local Taxi" : "One-Way";
+            echo json_encode([
+                "success" => false,
+                "status" => "low_wallet_balance",
+                "wallet_balance" => $vendorWalletBal,
+                "min_required" => $minWalletBalance,
+                "message" => "Insufficient wallet balance (₹" . number_format($vendorWalletBal, 2) . "). Minimum ₹" . number_format($minWalletBalance, 2) . " required to accept $rideTypeLabel trips. Please recharge your wallet."
+            ]);
+            exit;
+        }
+    }
 
     // 2️⃣ Check for driver or vehicle conflict within past 2 and next 2 days relative to selected booking date
     $sqlConflict = "
