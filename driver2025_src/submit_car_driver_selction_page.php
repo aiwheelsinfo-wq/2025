@@ -2,18 +2,29 @@
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
+header("Content-Type: application/json; charset=utf-8");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_NOTICE);
+ini_set('display_errors', 0);
 
 include 'db_connect.php'; // Include database connection
 
-$inputData = file_get_contents("php://input");
-$data = json_decode($inputData, true);
-
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+try {
+    $inputData = file_get_contents("php://input");
+    $data = json_decode($inputData, true);
+    if (!is_array($data)) {
+        $data = $_POST;
+    }
 
     $driver_id = isset($data['driver_id']) ? mysqli_real_escape_string($conn, $data['driver_id']) : NULL;
     $vehicle_id = isset($data['vehicle_id']) ? mysqli_real_escape_string($conn, $data['vehicle_id']) : NULL;
-    $booking_id = isset($data['booking_id']) ? mysqli_real_escape_string($conn, $data['booking_id']) : '';
-    $vender_id = isset($data['vender_id']) ? mysqli_real_escape_string($conn, $data['vender_id']) : '';
+    $booking_id = isset($data['booking_id']) ? mysqli_real_escape_string($conn, (string)$data['booking_id']) : '';
+    $vender_id = isset($data['vender_id']) ? mysqli_real_escape_string($conn, (string)$data['vender_id']) : '';
 
     if (empty($booking_id)) {
         echo json_encode(["success" => false, "message" => "Invalid booking ID"]);
@@ -41,16 +52,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false || stripos($trip_type, 'One-way') !== false || stripos($trip_type, 'One-Way') !== false) {
         $minWalletBalance = 0.00;
         
-        if (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false) {
-            $setStmt = $conn->query("SELECT min_wallet_balance FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
-            if ($setStmt && $sRow = $setStmt->fetch_assoc()) {
-                $minWalletBalance = (float)($sRow['min_wallet_balance'] ?? 0.00);
+        try {
+            if (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false) {
+                $setStmt = $conn->query("SELECT min_wallet_balance FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+                if ($setStmt && $sRow = $setStmt->fetch_assoc()) {
+                    $minWalletBalance = (float)($sRow['min_wallet_balance'] ?? 0.00);
+                }
+            } else {
+                $setStmt = $conn->query("SELECT min_wallet_balance FROM one_way_global_settings WHERE id = 1 LIMIT 1");
+                if ($setStmt && $sRow = $setStmt->fetch_assoc()) {
+                    $minWalletBalance = (float)($sRow['min_wallet_balance'] ?? 0.00);
+                }
             }
-        } else {
-            $setStmt = $conn->query("SELECT min_wallet_balance FROM one_way_global_settings WHERE id = 1 LIMIT 1");
-            if ($setStmt && $sRow = $setStmt->fetch_assoc()) {
-                $minWalletBalance = (float)($sRow['min_wallet_balance'] ?? 0.00);
-            }
+        } catch (Throwable $e) {
+            $minWalletBalance = 0.00;
         }
 
         $vendorWalletBal = 0.00;
@@ -143,12 +158,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if ($stmt->execute()) {
         // Send WhatsApp confirmation notification to customer
         try {
-            if (file_exists(__DIR__ . '/../notification_helper.php')) {
-                require_once __DIR__ . '/../notification_helper.php';
-            } else {
+            if (file_exists(__DIR__ . '/notification_helper.php')) {
+                require_once __DIR__ . '/notification_helper.php';
+            } elseif (file_exists(__DIR__ . '/../2025/notification_helper.php')) {
                 require_once __DIR__ . '/../2025/notification_helper.php';
             }
-            sendAcceptWhatsAppNotification($booking_id, $conn);
+            if (function_exists('sendAcceptWhatsAppNotification')) {
+                sendAcceptWhatsAppNotification($booking_id, $conn);
+            }
         } catch (Throwable $e) {
             error_log("WhatsApp Accept Notification error: " . $e->getMessage());
         }
@@ -165,6 +182,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 
     $stmt->close();
+} catch (Throwable $e) {
+    echo json_encode([
+        "success" => false,
+        "message" => "Server error: " . $e->getMessage()
+    ]);
 }
 
 $conn->close();
