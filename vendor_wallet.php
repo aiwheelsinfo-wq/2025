@@ -120,7 +120,7 @@ switch ($action) {
         }
 
         $balance = getVendorWalletBalance($conn, $phone);
-        $isEligible = ($balance > $minBalance);
+        $isEligible = ($balance >= $minBalance);
 
         // Fetch transaction history
         $txStmt = $conn->prepare("SELECT id, booking_id, transaction_type, amount, balance_before, balance_after, description, reference_id, created_at FROM vendor_wallet_transactions WHERE vendor_phone = ? ORDER BY id DESC LIMIT 50");
