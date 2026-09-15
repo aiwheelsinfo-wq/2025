@@ -88,12 +88,107 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Local-
         ]);
     }
 } else if (strcasecmp($trip_type, 'One-way') === 0) {
+    // 1. Fetch dynamic commission settings from one_way_global_settings
+    $companyShareActive = 1;
+    $companyShareType = 'percentage';
+    $companyShareValue = 15.00;
+    $companyShareBasis = 'subtotal';
+    $gStmt = $conn->query("SELECT company_share_active, company_share_type, company_share_value, company_share_basis FROM one_way_global_settings WHERE id = 1 LIMIT 1");
+    if ($gStmt && $gRow = $gStmt->fetch_assoc()) {
+        $companyShareActive = intval($gRow['company_share_active'] ?? 1);
+        $companyShareType = $gRow['company_share_type'] ?? 'percentage';
+        $companyShareValue = floatval($gRow['company_share_value'] ?? 15.00);
+        $companyShareBasis = $gRow['company_share_basis'] ?? 'subtotal';
+    }
+
+    // 2. Fetch booking details to check vehicle override or fallback amounts
+    $bCarQ = $conn->query("SELECT car_type, agni_amount, vendor_amount, total_amount, base_charge FROM bookings WHERE id = '" . mysqli_real_escape_string($conn, $booking_id) . "' LIMIT 1");
+    $carType = '';
+    if ($bCarQ && $bCarRow = $bCarQ->fetch_assoc()) {
+        $carType = $bCarRow['car_type'] ?? '';
+        if ($total_amount === null || $total_amount <= 0) {
+            $total_amount = floatval($bCarRow['total_amount'] ?? 0);
+        }
+        if ($base_charge === null || $base_charge <= 0) {
+            $base_charge = floatval($bCarRow['base_charge'] ?? 0);
+        }
+    }
+
+    // Check vehicle rule override
+    if (!empty($carType)) {
+        $safeCar = mysqli_real_escape_string($conn, $carType);
+        $vRuleQ = $conn->query("SELECT company_share_percent FROM one_way_vehicle_rules WHERE category_name = '$safeCar' LIMIT 1");
+        if ($vRuleQ && $vRow = $vRuleQ->fetch_assoc()) {
+            $vehOverride = floatval($vRow['company_share_percent'] ?? 0.0);
+            if ($vehOverride > 0) {
+                $companyShareValue = $vehOverride;
+                $companyShareType = 'percentage';
+            }
+        }
+    }
+
+    // 3. Calculate dynamic commission amount
+    $commissionAmount = 0.00;
+    if ($companyShareActive) {
+        $basisAmount = ($companyShareBasis === 'base_km' && $base_charge > 0) ? $base_charge : $total_amount;
+        if ($companyShareType === 'fixed') {
+            $commissionAmount = round(min($basisAmount, $companyShareValue), 2);
+        } else {
+            $commissionAmount = round($basisAmount * ($companyShareValue / 100.0), 2);
+        }
+    }
+
+    if ($agni_amount === null || $agni_amount <= 0) {
+        $agni_amount = $commissionAmount;
+    }
+    if ($vendor_amount === null || $vendor_amount <= 0) {
+        $vendor_amount = max(0, $total_amount - $agni_amount);
+    }
+
     // Prepare and bind
     $stmt = $conn->prepare("UPDATE bookings SET booking_status = ?, closing_km = ?, closing_date = ?, closing_time = ? ,invoice_no = ?, invoice_date = ?, toll_charge = ?, parking_charge =? , permit_charge =?, total_amount = ?, vendor_amount =?, agni_amount =? ,base_charge=? WHERE id = ?");
     $stmt->bind_param("sissssddddddss", $status, $closing_km, $closing_date, $closing_time,$next_invoice_no , $invoice_date, $toll_charge, $parking_charge, $permit_charge, $total_amount, $vendor_amount, $agni_amount, $base_charge,$booking_id);
 
     // Execute
     if ($stmt->execute()) {
+        // 4. Deduct commission from Vendor/Driver Prepaid Wallet
+        $vPhone = '';
+        $bQ = $conn->query("SELECT vender_id, driver_id FROM bookings WHERE id = '" . mysqli_real_escape_string($conn, $booking_id) . "' LIMIT 1");
+        if ($bQ && $brow = $bQ->fetch_assoc()) {
+            $vPhone = !empty($brow['vender_id']) ? $brow['vender_id'] : ($brow['driver_id'] ?? '');
+        }
+
+        if (!empty($vPhone) && $commissionAmount > 0) {
+            $balBefore = 0.00;
+            $wQ = $conn->query("SELECT wallet_balance FROM drivers WHERE phone_number = '" . mysqli_real_escape_string($conn, $vPhone) . "' LIMIT 1");
+            if ($wQ && $wrow = $wQ->fetch_assoc()) {
+                $balBefore = (float)$wrow['wallet_balance'];
+            } else {
+                $vwQ = $conn->query("SELECT wallet_balance FROM vendors WHERE phone_number = '" . mysqli_real_escape_string($conn, $vPhone) . "' LIMIT 1");
+                if ($vwQ && $vwrow = $vwQ->fetch_assoc()) {
+                    $balBefore = (float)$vwrow['wallet_balance'];
+                }
+            }
+            $balAfter = $balBefore - $commissionAmount;
+
+            // Deduct from drivers and vendors
+            $safePhone = mysqli_real_escape_string($conn, $vPhone);
+            $conn->query("UPDATE drivers SET wallet_balance = wallet_balance - $commissionAmount WHERE phone_number = '$safePhone'");
+            $conn->query("UPDATE vendors SET wallet_balance = wallet_balance - $commissionAmount WHERE phone_number = '$safePhone'");
+
+            // Record transaction ledger
+            $shareDesc = ($companyShareType === 'fixed') ? "₹" . number_format($companyShareValue, 2) : number_format($companyShareValue, 1) . "%";
+            $desc = "Commission (" . $shareDesc . ") for One-Way Trip #" . $booking_id;
+            $tType = 'trip_commission_deduct';
+            $logStmt = $conn->prepare("INSERT INTO vendor_wallet_transactions (vendor_phone, booking_id, transaction_type, amount, balance_before, balance_after, description) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            if ($logStmt) {
+                $bIdInt = (int)$booking_id;
+                $logStmt->bind_param("sisddds", $vPhone, $bIdInt, $tType, $commissionAmount, $balBefore, $balAfter, $desc);
+                $logStmt->execute();
+                $logStmt->close();
+            }
+        }
+
         preg_match('/\d+/', $next_invoice_no, $matches);
         $current_number = isset($matches[0]) ? (int)$matches[0] : 0;
         $prefix = preg_replace('/\d/', '', $next_invoice_no);
@@ -105,7 +200,13 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Local-
         $update_stmt->execute();
         $update_stmt->close();
 
-        echo json_encode(['success' => true, 'message' => 'Booking updated successfully']);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Booking updated successfully',
+            'commission_deducted' => $commissionAmount,
+            'commission_value' => $companyShareValue,
+            'commission_type' => $companyShareType
+        ]);
     } else {
         echo json_encode([
             'success' => false,

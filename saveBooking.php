@@ -188,73 +188,105 @@ if ($trip_type == 'One-way' && !empty($bookingId)) {
     }
 }
 
+$isOneWayDirect = (strcasecmp($trip_type, 'One-way') === 0 || $payment_type === 'Pay to Driver' || $payment_type === 'Cash');
+$booking_status_val = $isOneWayDirect ? 'Pending' : 'temp';
+if ($isOneWayDirect && (empty($payment_type) || $payment_type === 'Advance')) {
+    $payment_type = 'Pay to Driver';
+}
+
 if ($existingBookingFound) {
-        
-        
-        $updateBookingSql = "UPDATE bookings SET 
-    trip_type = '$trip_type',
-    car_type = '$car_type',
-    from_address = '$from_address',
-    to_address = '$to_address',
-    distance = '$distance',
-    date = '$date',
-    time = '$tripTime',
-    booked_at = '$booked_at',
-    mobile = '$contact_number',
-    agent_commission = '$agent_commission',
-    base_charge = '$base_charge',
-    driver_ta = '$driver_ta',
-    toll_charge = '$toll_charge',
-    total_amount = '$total_amount',
-    payment_type = '$payment_type',
-    return_date = '$return_date',
-    return_time = '$return_time',
-    otp = '$otp',
-    agni_amount = '$agni_amount',
-    vendor_amount = '$vendor_amount',
-    booker_id = '$userNumber',
-    gst = '$gst',
-    gst_number = '$gst_number',
-    business_name = '$business_name',
-    business_address = '$business_address',
-    business_pincode = '$business_pincode',
-    booking_status = 'temp'
-WHERE id = '$bookingId'"; // Assumes 'id' is the primary key column name
+    $updateBookingSql = "UPDATE bookings SET 
+        trip_type = '$trip_type',
+        car_type = '$car_type',
+        from_address = '$from_address',
+        to_address = '$to_address',
+        distance = '$distance',
+        date = '$date',
+        time = '$tripTime',
+        booked_at = '$booked_at',
+        mobile = '$contact_number',
+        agent_commission = '$agent_commission',
+        base_charge = '$base_charge',
+        driver_ta = '$driver_ta',
+        toll_charge = '$toll_charge',
+        total_amount = '$total_amount',
+        payment_type = '$payment_type',
+        return_date = '$return_date',
+        return_time = '$return_time',
+        otp = '$otp',
+        agni_amount = '$agni_amount',
+        vendor_amount = '$vendor_amount',
+        booker_id = '$userNumber',
+        gst = '$gst',
+        gst_number = '$gst_number',
+        business_name = '$business_name',
+        business_address = '$business_address',
+        business_pincode = '$business_pincode',
+        booking_status = '$booking_status_val'
+    WHERE id = '$bookingId'";
 
-if (mysqli_query($conn, $updateBookingSql)) {
-    $response["success"] = true;
-    $response["message"] = "Booking updated successfully";
-    $response["booking_id"] = $bookingId;
-    $final_booking_id = $bookingId;
-} else {
-    $response["success"] = false;
-    $response["message"] = "Error: " . mysqli_error($conn);
-}
+    if (mysqli_query($conn, $updateBookingSql)) {
+        $response["success"] = true;
+        $response["message"] = "Booking updated successfully";
+        $response["booking_id"] = $bookingId;
+        $final_booking_id = $bookingId;
 
-echo json_encode($response);
-
-
+        if ($isOneWayDirect && !empty($final_booking_id)) {
+            try {
+                require_once __DIR__ . '/send_new_booking_notification.php';
+                $notifLat = !empty($ref_lat) ? $ref_lat : null;
+                $notifLon = !empty($ref_lon) ? $ref_lon : null;
+                trigger_new_booking_notification($final_booking_id, $notifLat, $notifLon);
+                try {
+                    require_once __DIR__ . '/notification_helper.php';
+                    sendBookingWhatsAppNotification($final_booking_id, $conn);
+                } catch (Throwable $e) {
+                    error_log("WhatsApp Booking Notification error: " . $e->getMessage());
+                }
+            } catch (Throwable $e) {
+                error_log("FCM Notification error in saveBooking: " . $e->getMessage());
+            }
+        }
+    } else {
+        $response["success"] = false;
+        $response["message"] = "Error: " . mysqli_error($conn);
     }
-else{
 
-// 🔽 Now insert booking info into `bookings` table (only relevant fields)
-$insertBookingSql = "INSERT INTO bookings (trip_type, car_type, from_address, to_address, distance, date, time,booked_at, mobile, agent_commission, base_charge, driver_ta, toll_charge, total_amount, payment_type, return_date, return_time, otp, agni_amount, vendor_amount, booker_id, gst, gst_number, business_name, business_address, business_pincode, booking_status)
-VALUES ('$trip_type', '$car_type', '$from_address', '$to_address', '$distance', '$date', '$tripTime', '$booked_at', '$contact_number', '$agent_commission', '$base_charge', '$driver_ta', '$toll_charge', '$total_amount', '$payment_type', '$return_date', '$return_time', '$otp', '$agni_amount', '$vendor_amount', '$userNumber', '$gst', '$gst_number', '$business_name', '$business_address', '$business_pincode', 'temp')";
-
-
-if (mysqli_query($conn, $insertBookingSql)) {
-    $booking_id = mysqli_insert_id($conn); // get the auto-increment ID
-
-    $response["success"] = true;
-    $response["message"] = "Booking saved successfully";
-    $response["booking_id"] = $booking_id;
-    $final_booking_id = $booking_id;
+    echo json_encode($response);
 } else {
-    $response["success"] = false;
-    $response["message"] = "Error: " . mysqli_error($conn);
-}
+    // 🔽 Now insert booking info into `bookings` table (only relevant fields)
+    $insertBookingSql = "INSERT INTO bookings (trip_type, car_type, from_address, to_address, distance, date, time, booked_at, mobile, agent_commission, base_charge, driver_ta, toll_charge, total_amount, payment_type, return_date, return_time, otp, agni_amount, vendor_amount, booker_id, gst, gst_number, business_name, business_address, business_pincode, booking_status)
+    VALUES ('$trip_type', '$car_type', '$from_address', '$to_address', '$distance', '$date', '$tripTime', '$booked_at', '$contact_number', '$agent_commission', '$base_charge', '$driver_ta', '$toll_charge', '$total_amount', '$payment_type', '$return_date', '$return_time', '$otp', '$agni_amount', '$vendor_amount', '$userNumber', '$gst', '$gst_number', '$business_name', '$business_address', '$business_pincode', '$booking_status_val')";
 
-echo json_encode($response);
+    if (mysqli_query($conn, $insertBookingSql)) {
+        $booking_id = mysqli_insert_id($conn); // get the auto-increment ID
+        $response["success"] = true;
+        $response["message"] = "Booking saved successfully";
+        $response["booking_id"] = $booking_id;
+        $final_booking_id = $booking_id;
+
+        if ($isOneWayDirect && !empty($final_booking_id)) {
+            try {
+                require_once __DIR__ . '/send_new_booking_notification.php';
+                $notifLat = !empty($ref_lat) ? $ref_lat : null;
+                $notifLon = !empty($ref_lon) ? $ref_lon : null;
+                trigger_new_booking_notification($final_booking_id, $notifLat, $notifLon);
+                try {
+                    require_once __DIR__ . '/notification_helper.php';
+                    sendBookingWhatsAppNotification($final_booking_id, $conn);
+                } catch (Throwable $e) {
+                    error_log("WhatsApp Booking Notification error: " . $e->getMessage());
+                }
+            } catch (Throwable $e) {
+                error_log("FCM Notification error in saveBooking: " . $e->getMessage());
+            }
+        }
+    } else {
+        $response["success"] = false;
+        $response["message"] = "Error: " . mysqli_error($conn);
+    }
+
+    echo json_encode($response);
 }
 
 
