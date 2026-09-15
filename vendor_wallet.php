@@ -105,15 +105,21 @@ switch ($action) {
     // ==========================================
     case 'get_wallet':
         $phone = trim($_GET['phone_number'] ?? $_POST['phone_number'] ?? $jsonData['phone_number'] ?? '');
+        $settings = getLocalTaxiSettings($conn);
+        $minBalance = $settings['min_wallet_balance'];
+        $commissionRate = $settings['commission_rate'];
+
         if (empty($phone)) {
-            echo json_encode(["status" => "error", "message" => "Vendor phone number is required."]);
+            echo json_encode([
+                "status" => "success",
+                "min_wallet_balance" => $minBalance,
+                "commission_rate" => $commissionRate,
+                "message" => "Global wallet settings"
+            ]);
             exit;
         }
 
-        $settings = getLocalTaxiSettings($conn);
         $balance = getVendorWalletBalance($conn, $phone);
-        $minBalance = $settings['min_wallet_balance'];
-        $commissionRate = $settings['commission_rate'];
         $isEligible = ($balance > $minBalance);
 
         // Fetch transaction history
@@ -260,6 +266,45 @@ switch ($action) {
             "message" => "Balance adjusted successfully.",
             "wallet_balance" => $balanceAfter,
             "adjusted_amount" => $amount
+        ]);
+        exit;
+
+    // ==========================================
+    // 4. GET GLOBAL WALLET SETTINGS
+    // ==========================================
+    case 'get_wallet_settings':
+        $settings = getLocalTaxiSettings($conn);
+        echo json_encode([
+            "status" => "success",
+            "min_wallet_balance" => (float)$settings['min_wallet_balance'],
+            "commission_rate" => (float)$settings['commission_rate']
+        ]);
+        exit;
+
+    // ==========================================
+    // 5. UPDATE MINIMUM WALLET BALANCE (Admin)
+    // ==========================================
+    case 'update_min_wallet_balance':
+        $minBalance = isset($_POST['min_wallet_balance']) 
+            ? (float)$_POST['min_wallet_balance'] 
+            : (isset($jsonData['min_wallet_balance']) ? (float)$jsonData['min_wallet_balance'] : null);
+
+        if ($minBalance === null || $minBalance < 0) {
+            echo json_encode(["status" => "error", "message" => "Valid non-negative minimum wallet balance is required."]);
+            exit;
+        }
+
+        $uStmt = $conn->prepare("UPDATE local_taxi_global_settings SET min_wallet_balance = ? WHERE id = 1");
+        if ($uStmt) {
+            $uStmt->bind_param("d", $minBalance);
+            $uStmt->execute();
+            $uStmt->close();
+        }
+
+        echo json_encode([
+            "status" => "success",
+            "message" => "Minimum required wallet balance updated successfully to ₹" . number_format($minBalance, 2),
+            "min_wallet_balance" => $minBalance
         ]);
         exit;
 

@@ -76,6 +76,18 @@ if (!empty($data['global_settings'])) {
         $stmt->execute();
         $stmt->close();
     }
+
+    if (isset($g['min_wallet_balance'])) {
+        $minWallet = (float)$g['min_wallet_balance'];
+        if ($minWallet >= 0) {
+            $mwStmt = $conn->prepare("UPDATE `local_taxi_global_settings` SET `min_wallet_balance` = ? WHERE `id` = 1");
+            if ($mwStmt) {
+                $mwStmt->bind_param("d", $minWallet);
+                $mwStmt->execute();
+                $mwStmt->close();
+            }
+        }
+    }
 }
 
 // 2. Update Vehicle Rules

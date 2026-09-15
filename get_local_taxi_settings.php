@@ -130,6 +130,7 @@ echo json_encode([
         'company_share_active' => (bool)$global['company_share_active'],
         'company_share_type' => $global['company_share_type'] ?? 'percent',
         'company_share_value' => (float)$global['company_share_value'],
+        'min_wallet_balance' => (float)($global['min_wallet_balance'] ?? 0.00),
         'today_demand' => $todayDemand,
         'active_drivers' => $activeDrivers,
         'demand_supply_ratio' => $demandRatio,
