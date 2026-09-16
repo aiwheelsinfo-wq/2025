@@ -101,17 +101,42 @@ try {
         exit;
     }
 
-    // Check for 5 km radius limit and wallet balance on Local-taxi bookings
-    if (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false) {
-        // A. Wallet Balance Check for Local Taxi / Duty rides
+    // 🔒 Wallet Balance Validation for Local Taxi, Local-Duty, and One-Way rides
+    $isLocalDuty = (stripos($trip_type, 'duty') !== false);
+    $isLocalTaxi = !$isLocalDuty && (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false);
+    $isOneWay = (stripos($trip_type, 'One-way') !== false || stripos($trip_type, 'one way') !== false || stripos($trip_type, 'oneway') !== false);
+
+    if ($isLocalDuty || $isLocalTaxi || $isOneWay) {
         $minWalletBalance = 0.00;
-        if (stripos($trip_type, 'duty') !== false) {
-            $setStmt = $conn->query("SELECT min_wallet_balance FROM local_duty_global_settings WHERE id = 1 LIMIT 1");
-        } else {
-            $setStmt = $conn->query("SELECT min_wallet_balance FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
-        }
-        if ($setStmt && $sRow = $setStmt->fetch_assoc()) {
-            $minWalletBalance = (float)($sRow['min_wallet_balance'] ?? 0.00);
+        try {
+            if ($isOneWay) {
+                $setStmt = $conn->query("SELECT min_wallet_balance FROM one_way_global_settings WHERE id = 1 LIMIT 1");
+                if ($setStmt && $sRow = $setStmt->fetch_assoc() && (float)($sRow['min_wallet_balance'] ?? 0) > 0) {
+                    $minWalletBalance = (float)$sRow['min_wallet_balance'];
+                } else {
+                    $fbStmt = $conn->query("SELECT min_wallet_balance FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+                    if ($fbStmt && $fbRow = $fbStmt->fetch_assoc()) {
+                        $minWalletBalance = (float)($fbRow['min_wallet_balance'] ?? 0.00);
+                    }
+                }
+            } else if ($isLocalDuty) {
+                $setStmt = $conn->query("SELECT min_wallet_balance FROM local_duty_global_settings WHERE id = 1 LIMIT 1");
+                if ($setStmt && $sRow = $setStmt->fetch_assoc() && (float)($sRow['min_wallet_balance'] ?? 0) > 0) {
+                    $minWalletBalance = (float)$sRow['min_wallet_balance'];
+                } else {
+                    $fbStmt = $conn->query("SELECT min_wallet_balance FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+                    if ($fbStmt && $fbRow = $fbStmt->fetch_assoc()) {
+                        $minWalletBalance = (float)($fbRow['min_wallet_balance'] ?? 0.00);
+                    }
+                }
+            } else {
+                $setStmt = $conn->query("SELECT min_wallet_balance FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+                if ($setStmt && $sRow = $setStmt->fetch_assoc()) {
+                    $minWalletBalance = (float)($sRow['min_wallet_balance'] ?? 0.00);
+                }
+            }
+        } catch (Throwable $e) {
+            $minWalletBalance = 0.00;
         }
 
         // Check wallet balance of vendor/driver
@@ -127,18 +152,35 @@ try {
             $wStmt->close();
         }
 
+        if ($vendorWalletBal <= 0) {
+            $vwStmt = $conn->prepare("SELECT wallet_balance FROM vendors WHERE phone_number = ? LIMIT 1");
+            if ($vwStmt) {
+                $vwStmt->bind_param("s", $vendor_id);
+                $vwStmt->execute();
+                $vwStmt->bind_result($vwbal);
+                if ($vwStmt->fetch() && (float)$vwbal > 0) {
+                    $vendorWalletBal = (float)$vwbal;
+                }
+                $vwStmt->close();
+            }
+        }
+
         if ($vendorWalletBal <= $minWalletBalance) {
             $conn->rollback();
-            $tripLabel = (stripos($trip_type, 'duty') !== false) ? "Local-Duty" : "Local Taxi";
+            $tripLabel = $isLocalDuty ? "Local-Duty" : ($isLocalTaxi ? "Local Taxi" : "One-Way");
             echo json_encode([
                 "success" => false,
                 "status" => "low_wallet_balance",
                 "wallet_balance" => $vendorWalletBal,
                 "min_required" => $minWalletBalance,
-                "message" => "Insufficient wallet balance (₹" . number_format($vendorWalletBal, 2) . "). Please recharge your wallet to accept $tripLabel rides."
+                "message" => "Insufficient wallet balance (₹" . number_format($vendorWalletBal, 2) . "). Minimum ₹" . number_format($minWalletBalance, 2) . " required to accept $tripLabel trips. Please recharge your wallet."
             ]);
             exit;
         }
+    }
+
+    // Check for 5 km radius limit on Local-taxi bookings
+    if ($isLocalTaxi) {
 
         // 1. Get driver's location
         $driver_lat = null;

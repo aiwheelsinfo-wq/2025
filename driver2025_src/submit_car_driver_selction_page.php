@@ -51,7 +51,7 @@ try {
     // 🔒 Wallet Balance Validation for Local Taxi, Local-Duty, and One-Way rides
     $isLocalDuty = (stripos($trip_type, 'duty') !== false);
     $isLocalTaxi = !$isLocalDuty && (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false);
-    $isOneWay = (stripos($trip_type, 'One-way') !== false || stripos($trip_type, 'One-Way') !== false);
+    $isOneWay = (stripos($trip_type, 'One-way') !== false || stripos($trip_type, 'one way') !== false || stripos($trip_type, 'oneway') !== false);
 
     if ($isLocalDuty || $isLocalTaxi || $isOneWay) {
         $minWalletBalance = 0.00;
@@ -59,13 +59,23 @@ try {
         try {
             if ($isOneWay) {
                 $setStmt = $conn->query("SELECT min_wallet_balance FROM one_way_global_settings WHERE id = 1 LIMIT 1");
-                if ($setStmt && $sRow = $setStmt->fetch_assoc()) {
-                    $minWalletBalance = (float)($sRow['min_wallet_balance'] ?? 0.00);
+                if ($setStmt && $sRow = $setStmt->fetch_assoc() && (float)($sRow['min_wallet_balance'] ?? 0) > 0) {
+                    $minWalletBalance = (float)$sRow['min_wallet_balance'];
+                } else {
+                    $fbStmt = $conn->query("SELECT min_wallet_balance FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+                    if ($fbStmt && $fbRow = $fbStmt->fetch_assoc()) {
+                        $minWalletBalance = (float)($fbRow['min_wallet_balance'] ?? 0.00);
+                    }
                 }
             } else if ($isLocalDuty) {
                 $setStmt = $conn->query("SELECT min_wallet_balance FROM local_duty_global_settings WHERE id = 1 LIMIT 1");
-                if ($setStmt && $sRow = $setStmt->fetch_assoc()) {
-                    $minWalletBalance = (float)($sRow['min_wallet_balance'] ?? 0.00);
+                if ($setStmt && $sRow = $setStmt->fetch_assoc() && (float)($sRow['min_wallet_balance'] ?? 0) > 0) {
+                    $minWalletBalance = (float)$sRow['min_wallet_balance'];
+                } else {
+                    $fbStmt = $conn->query("SELECT min_wallet_balance FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+                    if ($fbStmt && $fbRow = $fbStmt->fetch_assoc()) {
+                        $minWalletBalance = (float)($fbRow['min_wallet_balance'] ?? 0.00);
+                    }
                 }
             } else {
                 $setStmt = $conn->query("SELECT min_wallet_balance FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
