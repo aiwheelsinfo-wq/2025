@@ -91,7 +91,7 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0) {
     // 1. Calculate dynamic Commission on Total Amount (10% default or admin configured) + 5% GST
     $companySharePercent = 10.00;
     try {
-        $gStmt = $conn->query("SELECT company_share_value, company_share_active FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+        $gStmt = $conn->query("SELECT company_share_value, company_share_active FROM local_duty_global_settings WHERE id = 1 LIMIT 1");
         if ($gStmt && $gRow = $gStmt->fetch_assoc()) {
             if (!empty($gRow['company_share_active'])) {
                 $companySharePercent = (float)($gRow['company_share_value'] ?? 10.00);

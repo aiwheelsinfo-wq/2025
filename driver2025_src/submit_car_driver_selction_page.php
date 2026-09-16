@@ -62,6 +62,11 @@ try {
                 if ($setStmt && $sRow = $setStmt->fetch_assoc()) {
                     $minWalletBalance = (float)($sRow['min_wallet_balance'] ?? 0.00);
                 }
+            } else if ($isLocalDuty) {
+                $setStmt = $conn->query("SELECT min_wallet_balance FROM local_duty_global_settings WHERE id = 1 LIMIT 1");
+                if ($setStmt && $sRow = $setStmt->fetch_assoc()) {
+                    $minWalletBalance = (float)($sRow['min_wallet_balance'] ?? 0.00);
+                }
             } else {
                 $setStmt = $conn->query("SELECT min_wallet_balance FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
                 if ($setStmt && $sRow = $setStmt->fetch_assoc()) {

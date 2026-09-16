@@ -103,9 +103,13 @@ try {
 
     // Check for 5 km radius limit and wallet balance on Local-taxi bookings
     if (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false) {
-        // A. Wallet Balance Check for Local Taxi rides
+        // A. Wallet Balance Check for Local Taxi / Duty rides
         $minWalletBalance = 0.00;
-        $setStmt = $conn->query("SELECT min_wallet_balance FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+        if (stripos($trip_type, 'duty') !== false) {
+            $setStmt = $conn->query("SELECT min_wallet_balance FROM local_duty_global_settings WHERE id = 1 LIMIT 1");
+        } else {
+            $setStmt = $conn->query("SELECT min_wallet_balance FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+        }
         if ($setStmt && $sRow = $setStmt->fetch_assoc()) {
             $minWalletBalance = (float)($sRow['min_wallet_balance'] ?? 0.00);
         }
