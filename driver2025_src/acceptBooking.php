@@ -125,12 +125,13 @@ try {
 
         if ($vendorWalletBal <= $minWalletBalance) {
             $conn->rollback();
+            $tripLabel = (stripos($trip_type, 'duty') !== false) ? "Local-Duty" : "Local Taxi";
             echo json_encode([
                 "success" => false,
                 "status" => "low_wallet_balance",
                 "wallet_balance" => $vendorWalletBal,
                 "min_required" => $minWalletBalance,
-                "message" => "Insufficient wallet balance (₹" . number_format($vendorWalletBal, 2) . "). Please recharge your wallet to accept Local Taxi rides."
+                "message" => "Insufficient wallet balance (₹" . number_format($vendorWalletBal, 2) . "). Please recharge your wallet to accept $tripLabel rides."
             ]);
             exit;
         }

@@ -350,6 +350,7 @@ try {
         "wallet_balance" => $wallet_balance,
         "min_wallet_balance" => $min_wallet_balance,
         "is_eligible_for_local_taxi" => ($wallet_balance > $min_wallet_balance),
+        "is_eligible_for_local_duty" => ($wallet_balance > $min_wallet_balance),
         "acceptedBookings" => $acceptedBookings,
         "bookings" => $bookings
     ];

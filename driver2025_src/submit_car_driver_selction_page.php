@@ -48,18 +48,22 @@ try {
     $selectedBookingDate = $bookingRow['date'];
     $trip_type = $bookingRow['trip_type'] ?? '';
 
-    // 🔒 Wallet Balance Validation for Local Taxi and One-Way rides
-    if (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false || stripos($trip_type, 'One-way') !== false || stripos($trip_type, 'One-Way') !== false) {
+    // 🔒 Wallet Balance Validation for Local Taxi, Local-Duty, and One-Way rides
+    $isLocalDuty = (stripos($trip_type, 'duty') !== false);
+    $isLocalTaxi = !$isLocalDuty && (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false);
+    $isOneWay = (stripos($trip_type, 'One-way') !== false || stripos($trip_type, 'One-Way') !== false);
+
+    if ($isLocalDuty || $isLocalTaxi || $isOneWay) {
         $minWalletBalance = 0.00;
         
         try {
-            if (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false) {
-                $setStmt = $conn->query("SELECT min_wallet_balance FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+            if ($isOneWay) {
+                $setStmt = $conn->query("SELECT min_wallet_balance FROM one_way_global_settings WHERE id = 1 LIMIT 1");
                 if ($setStmt && $sRow = $setStmt->fetch_assoc()) {
                     $minWalletBalance = (float)($sRow['min_wallet_balance'] ?? 0.00);
                 }
             } else {
-                $setStmt = $conn->query("SELECT min_wallet_balance FROM one_way_global_settings WHERE id = 1 LIMIT 1");
+                $setStmt = $conn->query("SELECT min_wallet_balance FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
                 if ($setStmt && $sRow = $setStmt->fetch_assoc()) {
                     $minWalletBalance = (float)($sRow['min_wallet_balance'] ?? 0.00);
                 }
@@ -94,7 +98,7 @@ try {
         }
 
         if ($vendorWalletBal <= $minWalletBalance) {
-            $rideTypeLabel = (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false) ? "Local Taxi" : "One-Way";
+            $rideTypeLabel = $isLocalDuty ? "Local-Duty" : ($isLocalTaxi ? "Local Taxi" : "One-Way");
             echo json_encode([
                 "success" => false,
                 "status" => "low_wallet_balance",
