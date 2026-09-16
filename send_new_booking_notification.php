@@ -163,7 +163,7 @@ function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon
     }
     
     // 1. Fetch booking details (including date and time)
-    $stmt = $conn->prepare("SELECT id, trip_type, from_address, to_address, vendor_amount, date, time FROM bookings WHERE id = ?");
+    $stmt = $conn->prepare("SELECT id, trip_type, from_address, to_address, vendor_amount, total_amount, date, time FROM bookings WHERE id = ?");
     if (!$stmt) {
         error_log("Notification DB Error: " . $conn->error);
         return;
@@ -185,6 +185,26 @@ function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon
     $pickup_location = $booking['from_address'] ?? '';
     $drop_location = $booking['to_address'] ?? '';
     $vendor_amount = $booking['vendor_amount'] ?? '0.00';
+
+    // 🔥 Recalculate vendor_amount live for Local-Duty based on admin setting
+    if ((stripos($trip_type, 'duty') !== false) && !empty($booking['total_amount'])) {
+        $totAmt = floatval($booking['total_amount']);
+        $dShare = 10.00;
+        try {
+            $gS = $conn->query("SELECT company_share_value, company_share_active FROM local_duty_global_settings WHERE id = 1 LIMIT 1");
+            if ($gS && $gR = $gS->fetch_assoc()) {
+                if (!empty($gR['company_share_active'])) {
+                    $dShare = (float)($gR['company_share_value'] ?? 10.00);
+                } else {
+                    $dShare = 0.00;
+                }
+            }
+        } catch (Throwable $e) {}
+        if ($totAmt > 0) {
+            $vendor_amount = (string)max(0.00, round($totAmt - ($totAmt * ($dShare / 100.0)), 2));
+        }
+    }
+
     $booking_date = trim($booking['date'] ?? '');
     $booking_time = trim($booking['time'] ?? '');
 

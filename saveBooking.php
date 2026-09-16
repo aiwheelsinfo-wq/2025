@@ -112,6 +112,29 @@ $agent_commission = $_POST['agent_commission'] ?? '';
 $booking_authority = (!empty($agent_commission) && $agent_commission > 0) ? 'agent' : 'customer';
 $agni_amount = $_POST['agni_amount'] ?? '';
 $vendor_amount = $_POST['vendor_amount'] ?? '';
+
+// 🔥 Dynamic Platform Commission Calculation for Local-Duty based on live Admin Settings
+if (strcasecmp($trip_type, 'Local-Duty') === 0 || strcasecmp($trip_type, 'Local Duty') === 0 || stripos($trip_type, 'Local-duty') !== false) {
+    $dutySharePercent = 10.00;
+    try {
+        $gStmt = $conn->query("SELECT company_share_value, company_share_active FROM local_duty_global_settings WHERE id = 1 LIMIT 1");
+        if ($gStmt && $gRow = $gStmt->fetch_assoc()) {
+            if (!empty($gRow['company_share_active'])) {
+                $dutySharePercent = (float)($gRow['company_share_value'] ?? 10.00);
+            } else {
+                $dutySharePercent = 0.00;
+            }
+        }
+    } catch (Throwable $e) {}
+
+    $totVal = floatval($total_amount);
+    if ($totVal > 0) {
+        $agniCalc = round($totVal * ($dutySharePercent / 100.0), 2);
+        $vendorCalc = max(0.00, round($totVal - $agniCalc, 2));
+        $agni_amount = (string)$agniCalc;
+        $vendor_amount = (string)$vendorCalc;
+    }
+}
 $user_type = $_POST['user_type'] ?? '';
 $customer_mob = $_POST['customer_mob'] ?? '';
 $gst = $_POST['gst'] ?? '';
