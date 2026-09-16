@@ -172,6 +172,19 @@ try {
     }
     $stmtAccepted->close();
 
+    // Fetch Local Duty global settings for dynamic commission and wallet balance threshold
+    $ldCommission = 10.00;
+    $ldActive = false;
+    $ldType = 'percent';
+    $ldMinWallet = 0.00;
+    $ldQ = $conn->query("SELECT company_share_active, company_share_type, company_share_value, min_wallet_balance FROM local_duty_global_settings WHERE id = 1 LIMIT 1");
+    if ($ldQ && $ldR = $ldQ->fetch_assoc()) {
+        $ldActive = ((int)$ldR['company_share_active'] === 1);
+        $ldType = $ldR['company_share_type'] ?? 'percent';
+        $ldCommission = (float)($ldR['company_share_value'] ?? 10.00);
+        $ldMinWallet = (float)($ldR['min_wallet_balance'] ?? 0.00);
+    }
+
     // ===================== Fetch Pending Bookings =====================
     $sqlPending = "
         SELECT 
@@ -254,6 +267,16 @@ try {
     }
 
     while ($stmtPending->fetch()) {
+        // Dynamically compute vendor_amount for Local-Duty based on live admin commission
+        if (stripos($trip_type, 'duty') !== false && $ldActive) {
+            $tAmount = (float)$total_amount;
+            if ($ldType === 'flat') {
+                $vendor_amount = max(0, $tAmount - $ldCommission);
+            } else {
+                $vendor_amount = max(0, round($tAmount - ($tAmount * ($ldCommission / 100)), 2));
+            }
+        }
+
         $radius_km = 20;
         if (stripos($trip_type, 'Local-taxi') !== false) {
             $radius_km = 5;
@@ -349,8 +372,9 @@ try {
         "success" => true,
         "wallet_balance" => $wallet_balance,
         "min_wallet_balance" => $min_wallet_balance,
+        "min_wallet_balance_local_duty" => $ldMinWallet,
         "is_eligible_for_local_taxi" => ($wallet_balance > $min_wallet_balance),
-        "is_eligible_for_local_duty" => ($wallet_balance > $min_wallet_balance),
+        "is_eligible_for_local_duty" => ($wallet_balance > $ldMinWallet),
         "acceptedBookings" => $acceptedBookings,
         "bookings" => $bookings
     ];
