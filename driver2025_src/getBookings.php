@@ -286,8 +286,8 @@ try {
             $radius_km = 5;
         }
 
-        // Apply distance filter if driver location is available
-        if ($driver_lat !== null && $driver_lon !== null && $driver_lat != 0 && $driver_lon != 0) {
+        // Apply distance filter if driver location is available (for today's immediate rides only; advance rides visible to all)
+        if ($date == $currentDate && $driver_lat !== null && $driver_lon !== null && $driver_lat != 0 && $driver_lon != 0) {
             // Geocode the booking's pickup address
             $pickup_lat = null;
             $pickup_lng = null;
@@ -368,13 +368,21 @@ try {
         $min_wallet_balance = (float)($mwR['min_wallet_balance'] ?? 0.00);
     }
 
+    $rtMinWallet = 1000.00;
+    $rtQ = $conn->query("SELECT min_wallet_balance FROM round_trip_global_settings WHERE id = 1 LIMIT 1");
+    if ($rtQ && $rtR = $rtQ->fetch_assoc()) {
+        $rtMinWallet = (float)($rtR['min_wallet_balance'] ?? 1000.00);
+    }
+
     $response = [
         "success" => true,
         "wallet_balance" => $wallet_balance,
         "min_wallet_balance" => $min_wallet_balance,
         "min_wallet_balance_local_duty" => $ldMinWallet,
+        "min_wallet_balance_round_trip" => $rtMinWallet,
         "is_eligible_for_local_taxi" => ($wallet_balance > $min_wallet_balance),
         "is_eligible_for_local_duty" => ($wallet_balance > $ldMinWallet),
+        "is_eligible_for_round_trip" => ($wallet_balance > $rtMinWallet),
         "acceptedBookings" => $acceptedBookings,
         "bookings" => $bookings
     ];

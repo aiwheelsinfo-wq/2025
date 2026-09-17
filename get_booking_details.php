@@ -17,6 +17,7 @@ $sql = "SELECT
             b.car_type,
             b.from_address,
             b.to_address,
+            b.distance,
             b.date,
             b.time,
             b.total_amount,
@@ -26,10 +27,14 @@ $sql = "SELECT
             b.base_charge,
             b.booking_status,
             b.vender_id,
+            b.per_km_charge,
+            t.kmRate,
+            t.driver_allowance,
             u.name AS customer_name
         FROM bookings b
+        LEFT JOIN tripCostTable t ON (t.tripType = 'Round-Trip' OR t.tripType = b.trip_type) AND t.carType = b.car_type
         LEFT JOIN users u ON b.mobile = u.phone_number
-        WHERE b.id = '$booking_id'";
+        WHERE b.id = '$booking_id' OR b.booking_id = '$booking_id' LIMIT 1";
 
 $result = mysqli_query($conn, $sql);
 

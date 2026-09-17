@@ -78,7 +78,7 @@ $conn->begin_transaction();
 
 try {
     // Select booking with FOR UPDATE to lock the row
-    $stmt = $conn->prepare("SELECT booking_status, date, trip_type, from_address FROM bookings WHERE id = ? FOR UPDATE");
+    $stmt = $conn->prepare("SELECT booking_status, date, return_date, trip_type, from_address FROM bookings WHERE id = ? FOR UPDATE");
     $stmt->bind_param("i", $booking_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -92,6 +92,9 @@ try {
     $booking = $result->fetch_assoc();
     $status = $booking['booking_status'];
     $selectedBookingDate = $booking['date'];
+    $selectedReturnDate = (!empty($booking['return_date']) && $booking['return_date'] != '1970-01-01' && $booking['return_date'] != '0000-00-00' && $booking['return_date'] >= $selectedBookingDate) 
+        ? $booking['return_date'] 
+        : $selectedBookingDate;
     $trip_type = $booking['trip_type'] ?? '';
     $from_address = $booking['from_address'] ?? '';
     
@@ -101,15 +104,23 @@ try {
         exit;
     }
 
-    // 🔒 Wallet Balance Validation for Local Taxi, Local-Duty, and One-Way rides
+    // 🔒 Wallet Balance Validation for Local Taxi, Local-Duty, One-Way, and Round-Trip rides
     $isLocalDuty = (stripos($trip_type, 'duty') !== false);
     $isLocalTaxi = !$isLocalDuty && (stripos($trip_type, 'Local') !== false || stripos($trip_type, 'taxi') !== false);
     $isOneWay = (stripos($trip_type, 'One-way') !== false || stripos($trip_type, 'one way') !== false || stripos($trip_type, 'oneway') !== false);
+    $isRoundTrip = (stripos($trip_type, 'Round') !== false || stripos($trip_type, 'round') !== false);
 
-    if ($isLocalDuty || $isLocalTaxi || $isOneWay) {
+    if ($isLocalDuty || $isLocalTaxi || $isOneWay || $isRoundTrip) {
         $minWalletBalance = 0.00;
         try {
-            if ($isOneWay) {
+            if ($isRoundTrip) {
+                $setStmt = $conn->query("SELECT min_wallet_balance FROM round_trip_global_settings WHERE id = 1 LIMIT 1");
+                if ($setStmt && $sRow = $setStmt->fetch_assoc() && (float)($sRow['min_wallet_balance'] ?? 0) > 0) {
+                    $minWalletBalance = (float)$sRow['min_wallet_balance'];
+                } else {
+                    $minWalletBalance = 1000.00;
+                }
+            } else if ($isOneWay) {
                 $setStmt = $conn->query("SELECT min_wallet_balance FROM one_way_global_settings WHERE id = 1 LIMIT 1");
                 if ($setStmt && $sRow = $setStmt->fetch_assoc() && (float)($sRow['min_wallet_balance'] ?? 0) > 0) {
                     $minWalletBalance = (float)$sRow['min_wallet_balance'];
@@ -167,7 +178,7 @@ try {
 
         if ($vendorWalletBal <= $minWalletBalance) {
             $conn->rollback();
-            $tripLabel = $isLocalDuty ? "Local-Duty" : ($isLocalTaxi ? "Local Taxi" : "One-Way");
+            $tripLabel = $isRoundTrip ? "Round-Trip" : ($isLocalDuty ? "Local-Duty" : ($isLocalTaxi ? "Local Taxi" : "One-Way"));
             echo json_encode([
                 "success" => false,
                 "status" => "low_wallet_balance",
@@ -179,8 +190,8 @@ try {
         }
     }
 
-    // Check for 5 km radius limit on Local-taxi bookings
-    if ($isLocalTaxi) {
+    // Check for 5 km radius limit on Local-taxi bookings (immediate/today rides only)
+    if ($isLocalTaxi && $selectedBookingDate <= date('Y-m-d')) {
 
         // 1. Get driver's location
         $driver_lat = null;
@@ -250,31 +261,32 @@ try {
         }
     }
 
-    // Check for driver or vehicle conflict within past 2 and next 2 days relative to selected booking date
+    // Check for driver or vehicle conflict overlapping with this booking's date range
     if (!empty($driver_id) || !empty($vehicle_id)) {
         $sqlConflict = "
-            SELECT id, driver_id, vehicle_id, date, booking_status
+            SELECT id, driver_id, vehicle_id, date, return_date, booking_status
             FROM bookings
-            WHERE date BETWEEN DATE_SUB(?, INTERVAL 2 DAY) AND DATE_ADD(?, INTERVAL 2 DAY)
-            AND id != ?
-            AND booking_status != 'Completed'
-            AND booking_status != 'Cancelled'
-            AND booking_status != 'Customer Cancelled'
+            WHERE id != ?
+            AND booking_status NOT IN ('Completed', 'Cancelled', 'Customer Cancelled')
             AND (
                 (? != '' AND driver_id = ?) 
                 OR (? != '' AND vehicle_id = ?)
             )
+            AND (
+                date <= ?
+                AND (CASE WHEN return_date IS NOT NULL AND return_date != '1970-01-01' AND return_date != '0000-00-00' AND return_date >= date THEN return_date ELSE date END) >= ?
+            )
         ";
         
         $stmtConflict = $conn->prepare($sqlConflict);
-        $stmtConflict->bind_param("ssissss", 
-            $selectedBookingDate, 
-            $selectedBookingDate, 
+        $stmtConflict->bind_param("issssss", 
             $booking_id, 
             $driver_id, 
             $driver_id, 
             $vehicle_id, 
-            $vehicle_id
+            $vehicle_id,
+            $selectedReturnDate, 
+            $selectedBookingDate
         );
         $stmtConflict->execute();
         $conflictResult = $stmtConflict->get_result();
@@ -295,8 +307,8 @@ try {
             }
             
             $messages = [];
-            if ($driverConflict) $messages[] = "Selected driver is already booked for another trip within 2 days of this date.";
-            if ($vehicleConflict) $messages[] = "Selected vehicle is already booked for another trip within 2 days of this date.";
+            if ($driverConflict) $messages[] = "Selected driver is already booked for an overlapping trip on this date.";
+            if ($vehicleConflict) $messages[] = "Selected vehicle is already booked for an overlapping trip on this date.";
             
             $conn->rollback();
             echo json_encode(["success" => false, "message" => implode(" ", $messages)]);

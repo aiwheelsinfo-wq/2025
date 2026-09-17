@@ -84,14 +84,18 @@ if (!function_exists('get_vendor_free_capacity')) {
     /**
      * Calculates the free driver/vehicle capacity for a vendor or driver.
      * Returns the count of available drivers/vehicles.
-     * If <= 0, all fleet assets are currently busy on active trips (Accepted/Started/On-Duty).
+     * Differentiates between today's active trips and future advance reservations:
+     * - Trips with status Started, On-Duty, Arrived, On-Trip are currently running.
+     * - Trips with status Accepted only occupy today's capacity if scheduled for today.
+     * - Trips scheduled for future dates (> today) do NOT block today's on-demand dispatches.
      */
-    function get_vendor_free_capacity($conn, $vendor_phone) {
+    function get_vendor_free_capacity($conn, $vendor_phone, $target_booking_date = null, $target_return_date = null) {
         if (empty($vendor_phone)) {
             return 1;
         }
         
         $escaped_phone = mysqli_real_escape_string($conn, $vendor_phone);
+        $today = date('Y-m-d');
         
         // 1. Get all driver phone numbers associated with this vendor (including vendor themselves)
         $linked_driver_phones = [$escaped_phone];
@@ -108,13 +112,43 @@ if (!function_exists('get_vendor_free_capacity')) {
         $total_drivers = count($linked_driver_phones);
         
         // 2. Query active/busy trips currently assigned to this vendor or any of their linked drivers
-        // Trips with status Accepted, Started, On-Duty, Arrived are currently running/busy.
-        // Completed, Cancelled, and Customer Cancelled release the driver.
         $drivers_in_list = "'" . implode("','", $linked_driver_phones) . "'";
-        $busy_sql = "SELECT COUNT(DISTINCT id) AS busy_count 
-                     FROM bookings 
-                     WHERE (vender_id = '$escaped_phone' OR driver_id IN ($drivers_in_list))
-                       AND booking_status IN ('Accepted', 'Started', 'On-Duty', 'Arrived', 'On-Trip')";
+        
+        if (empty($target_booking_date) || $target_booking_date <= $today) {
+            // Checking capacity for TODAY:
+            // Driver is busy today only if they are on an active running trip (Started/On-Duty/Arrived/On-Trip),
+            // OR have an Accepted trip for TODAY (or an ongoing multi-day trip spanning today).
+            $busy_sql = "SELECT COUNT(DISTINCT id) AS busy_count 
+                         FROM bookings 
+                         WHERE (vender_id = '$escaped_phone' OR driver_id IN ($drivers_in_list))
+                           AND (
+                               booking_status IN ('Started', 'On-Duty', 'Arrived', 'On-Trip')
+                               OR (
+                                   booking_status = 'Accepted' 
+                                   AND (
+                                       date = '$today'
+                                       OR (return_date IS NOT NULL AND return_date != '1970-01-01' AND return_date != '0000-00-00' AND date <= '$today' AND return_date >= '$today')
+                                   )
+                               )
+                           )";
+        } else {
+            // Checking capacity for a FUTURE date ($target_booking_date > today):
+            // Busy count checks if the driver already has an overlapping trip on that specific future date.
+            $escaped_target_date = mysqli_real_escape_string($conn, $target_booking_date);
+            $escaped_target_end = (!empty($target_return_date) && $target_return_date >= $target_booking_date && $target_return_date != '1970-01-01' && $target_return_date != '0000-00-00') 
+                ? mysqli_real_escape_string($conn, $target_return_date) 
+                : $escaped_target_date;
+                
+            $busy_sql = "SELECT COUNT(DISTINCT id) AS busy_count 
+                         FROM bookings 
+                         WHERE (vender_id = '$escaped_phone' OR driver_id IN ($drivers_in_list))
+                           AND booking_status IN ('Accepted', 'Started', 'On-Duty', 'Arrived', 'On-Trip')
+                           AND (
+                               date <= '$escaped_target_end'
+                               AND (CASE WHEN return_date IS NOT NULL AND return_date != '1970-01-01' AND return_date != '0000-00-00' AND return_date >= date THEN return_date ELSE date END) >= '$escaped_target_date'
+                           )";
+        }
+        
         $busy_res = mysqli_query($conn, $busy_sql);
         $busy_count = 0;
         if ($busy_res) {
@@ -162,8 +196,8 @@ function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon
         return;
     }
     
-    // 1. Fetch booking details (including date and time)
-    $stmt = $conn->prepare("SELECT id, trip_type, from_address, to_address, vendor_amount, total_amount, date, time FROM bookings WHERE id = ?");
+    // 1. Fetch booking details (including date, time, distance, and return_date)
+    $stmt = $conn->prepare("SELECT id, trip_type, car_type, from_address, to_address, distance, vendor_amount, total_amount, date, time, return_date FROM bookings WHERE id = ?");
     if (!$stmt) {
         error_log("Notification DB Error: " . $conn->error);
         return;
@@ -182,9 +216,27 @@ function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon
     
     $booking_id_str = (string)$booking['id'];
     $trip_type = $booking['trip_type'] ?? '';
+    $car_type = $booking['car_type'] ?? '';
     $pickup_location = $booking['from_address'] ?? '';
     $drop_location = $booking['to_address'] ?? '';
+    $distance = $booking['distance'] ?? '';
     $vendor_amount = $booking['vendor_amount'] ?? '0.00';
+
+    // Look up kmRate for Round-Trip
+    $km_rate = '';
+    $isRoundTrip = (stripos($trip_type, 'round') !== false);
+    if ($isRoundTrip && !empty($car_type)) {
+        $tcStmt = $conn->prepare("SELECT kmRate FROM tripCostTable WHERE tripType = 'Round-Trip' AND carType = ? LIMIT 1");
+        if ($tcStmt) {
+            $tcStmt->bind_param("s", $car_type);
+            $tcStmt->execute();
+            $tcRes = $tcStmt->get_result();
+            if ($tcRow = $tcRes->fetch_assoc()) {
+                $km_rate = (string)$tcRow['kmRate'];
+            }
+            $tcStmt->close();
+        }
+    }
 
     // 🔥 Recalculate vendor_amount live for Local-Duty based on admin setting
     if ((stripos($trip_type, 'duty') !== false) && !empty($booking['total_amount'])) {
@@ -207,6 +259,7 @@ function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon
 
     $booking_date = trim($booking['date'] ?? '');
     $booking_time = trim($booking['time'] ?? '');
+    $booking_return_date = trim($booking['return_date'] ?? '');
 
 
     // Geocode customer's pickup address using Google Geocoding API if coordinates are not provided
@@ -287,7 +340,7 @@ function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon
         // If solo driver is on an accepted trip, free_capacity will be <= 0 and notification is skipped.
         // If vendor has more drivers than active trips, free_capacity > 0 and notification is sent.
         $driver_phone = $row['phone_number'];
-        $free_capacity = get_vendor_free_capacity($conn, $driver_phone);
+        $free_capacity = get_vendor_free_capacity($conn, $driver_phone, $booking_date, $booking_return_date);
         if ($free_capacity <= 0) {
             error_log("Notification Dispatch: Driver/Vendor $driver_phone has no free capacity ($free_capacity available). Skipping alert.");
             continue;
@@ -322,11 +375,15 @@ function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon
         $effective_countdown = 0;
     } else {
         // Today's urgent ride OR emergency scheduled retry!
+        $formattedEarnings = ($isRoundTrip && !empty($km_rate)) 
+            ? ("₹" . number_format((float)$km_rate, 0) . "/km") 
+            : ("₹" . number_format((float)$vendor_amount, 2));
+
         $replacements = [
             '{trip_type}' => $trip_type,
             '{pickup_location}' => $pickup_location,
             '{drop_location}' => !empty($drop_location) ? $drop_location : 'As directed',
-            '{vendor_amount}' => number_format((float)$vendor_amount, 2),
+            '{vendor_amount}' => $formattedEarnings,
             '{booking_id}' => $booking_id_str
         ];
         $titleText = str_replace(array_keys($replacements), array_values($replacements), $title_template);
@@ -373,9 +430,12 @@ function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon
             'body' => $bodyText,
             'booking_id' => $booking_id_str,
             'booking_type' => $trip_type,
+            'car_type' => (string)$car_type,
             'pickup_location' => $pickup_location,
             'drop_location' => $drop_location,
+            'distance' => (string)$distance,
             'vendor_amount' => (string)$vendor_amount,
+            'km_rate' => (string)$km_rate,
             'countdown_seconds' => (string)$effective_countdown,
             'vibrate_seconds' => $is_advance_booking ? '1' : (string)$vibration_duration_sec,
             'ringtone_name' => $sound_for_fcm,

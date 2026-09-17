@@ -61,13 +61,79 @@ if ($result && $row = $result->fetch_assoc()) {
 $invoice_date = date('Y-m-d'); 
 
 // Validation
-if (strcasecmp($trip_type, 'Round-Trip') === 0) {
+if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Round-trip') === 0 || strcasecmp($trip_type, 'Round trip') === 0) {
+    // 1. Fetch dynamic commission settings from round_trip_global_settings
+    $companySharePercent = 10.00;
+    $companyShareType = 'percent';
+    $companyShareActive = 1;
+    try {
+        $gStmt = $conn->query("SELECT company_share_active, company_share_type, company_share_value FROM round_trip_global_settings WHERE id = 1 LIMIT 1");
+        if ($gStmt && $gRow = $gStmt->fetch_assoc()) {
+            $companyShareActive = intval($gRow['company_share_active'] ?? 1);
+            $companyShareType = $gRow['company_share_type'] ?? 'percent';
+            $companySharePercent = (float)($gRow['company_share_value'] ?? 10.00);
+        }
+    } catch (Throwable $e) {}
+
+    // 2. Calculate dynamic commission amount + 5% GST
+    $commissionAmount = 0.00;
+    if ($companyShareActive) {
+        if ($companyShareType === 'flat') {
+            $commissionAmount = round(min($total_amount, $companySharePercent), 2);
+        } else {
+            $commissionAmount = round(($total_amount * ($companySharePercent / 100.0)), 2);
+        }
+    }
+    $gstAmount = round(($total_amount * 0.05), 2);
+    $totalDeductionAmount = round($commissionAmount + $gstAmount, 2);
+
+    $agni_amount = $totalDeductionAmount;
+    $vendor_amount = max(0, $total_amount - $totalDeductionAmount);
+
     // Prepare and bind - updated to support agent_commission
     $stmt = $conn->prepare("UPDATE bookings SET booking_status = ?, closing_km = ?, closing_date = ?, closing_time = ?, total_amount = ?, vendor_amount = ?, agni_amount = ?, agent_commission = ?, invoice_no = ?, invoice_date = ?, toll_charge=?, parking_charge=?, permit_charge =? WHERE id = ?");
     $stmt->bind_param("sissddddssddds", $status, $closing_km, $closing_date, $closing_time, $total_amount, $vendor_amount, $agni_amount, $agent_commission, $next_invoice_no, $invoice_date, $toll_charge, $parking_charge, $permit_charge, $booking_id);
 
     // Execute
     if ($stmt->execute()) {
+        // Deduct commission and GST from Vendor/Driver Prepaid Wallet
+        $vPhone = '';
+        $bQ = $conn->query("SELECT vender_id, driver_id FROM bookings WHERE id = '" . mysqli_real_escape_string($conn, $booking_id) . "' LIMIT 1");
+        if ($bQ && $brow = $bQ->fetch_assoc()) {
+            $vPhone = !empty($brow['vender_id']) ? $brow['vender_id'] : ($brow['driver_id'] ?? '');
+        }
+
+        if (!empty($vPhone) && $totalDeductionAmount > 0) {
+            $balBefore = 0.00;
+            $wQ = $conn->query("SELECT wallet_balance FROM drivers WHERE phone_number = '" . mysqli_real_escape_string($conn, $vPhone) . "' LIMIT 1");
+            if ($wQ && $wrow = $wQ->fetch_assoc()) {
+                $balBefore = (float)$wrow['wallet_balance'];
+            } else {
+                $vwQ = $conn->query("SELECT wallet_balance FROM vendors WHERE phone_number = '" . mysqli_real_escape_string($conn, $vPhone) . "' LIMIT 1");
+                if ($vwQ && $vwrow = $vwQ->fetch_assoc()) {
+                    $balBefore = (float)$vwrow['wallet_balance'];
+                }
+            }
+            $balAfter = $balBefore - $totalDeductionAmount;
+
+            // Deduct from drivers and vendors
+            $safePhone = mysqli_real_escape_string($conn, $vPhone);
+            $conn->query("UPDATE drivers SET wallet_balance = wallet_balance - $totalDeductionAmount WHERE phone_number = '$safePhone'");
+            $conn->query("UPDATE vendors SET wallet_balance = wallet_balance - $totalDeductionAmount WHERE phone_number = '$safePhone'");
+
+            // Record transaction ledger
+            $shareDesc = ($companyShareType === 'flat') ? "₹" . number_format($companySharePercent, 2) : number_format($companySharePercent, 1) . "%";
+            $desc = "Platform Commission (" . $shareDesc . ": ₹" . number_format($commissionAmount, 0) . ") + 5% GST (₹" . number_format($gstAmount, 0) . ") for Round-Trip Trip #" . $booking_id;
+            $tType = 'trip_commission_deduct';
+            $logStmt = $conn->prepare("INSERT INTO vendor_wallet_transactions (vendor_phone, booking_id, transaction_type, amount, balance_before, balance_after, description) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            if ($logStmt) {
+                $bIdInt = (int)$booking_id;
+                $logStmt->bind_param("sisddds", $vPhone, $bIdInt, $tType, $totalDeductionAmount, $balBefore, $balAfter, $desc);
+                $logStmt->execute();
+                $logStmt->close();
+            }
+        }
+
         preg_match('/\d+/', $next_invoice_no, $matches);
         $current_number = isset($matches[0]) ? (int)$matches[0] : 0;
         $prefix = preg_replace('/\d/', '', $next_invoice_no);
@@ -79,7 +145,13 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0) {
         $update_stmt->execute();
         $update_stmt->close();
 
-        echo json_encode(['success' => true, 'message' => 'Booking updated successfully']);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Booking updated successfully',
+            'commission_deducted' => $commissionAmount,
+            'gst_deducted' => $gstAmount,
+            'total_wallet_deducted' => $totalDeductionAmount
+        ]);
     } else {
         echo json_encode([
             'success' => false,
