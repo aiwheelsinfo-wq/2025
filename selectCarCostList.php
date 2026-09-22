@@ -51,35 +51,75 @@ $rawToAddress   = $_GET['toAddress'] ?? $_GET['to_address'] ?? '';
 $fromAddress    = $rawFromAddress;
 $toAddress      = $rawToAddress;
 
-// 1. Direct explicit distance parameter passed by frontend
+$trafficInfo = [
+    'normal_duration_sec' => 0,
+    'traffic_duration_sec' => 0,
+    'normal_duration_text' => '',
+    'traffic_duration_text' => ''
+];
+
+if (isset($_GET['trafficDelayMin']) && is_numeric($_GET['trafficDelayMin'])) {
+    $trafficInfo['traffic_delay_min'] = floatval($_GET['trafficDelayMin']);
+}
+
+$isLocalTaxi = ($tripType === 'Local Taxi' || $tripType === 'Local-Taxi' || strtolower($tripType) === 'local taxi');
+
+// 1. Explicit distance passed by frontend
 if (isset($_GET['distance']) && floatval($_GET['distance']) > 0 && floatval($_GET['distance']) < 900) {
     $distance_km = floatval($_GET['distance']);
-} 
-// 2. Direct fromAddress & toAddress passed by frontend
-elseif (!empty($rawFromAddress) && !empty($rawToAddress)) {
+}
+
+// 2. Query Google Distance Matrix (with departure_time=now for live traffic if addresses or coordinates are provided)
+if (!empty($rawFromAddress) && !empty($rawToAddress)) {
     $fromEnc = urlencode($rawFromAddress);
     $toEnc = urlencode($rawToAddress);
-    $distUrl = "https://maps.googleapis.com/maps/api/distancematrix/json?origins=$fromEnc&destinations=$toEnc&key=$apiKey";
-    $distResponse = @file_get_contents($distUrl);
+    $distUrl = "https://maps.googleapis.com/maps/api/distancematrix/json?origins=$fromEnc&destinations=$toEnc&departure_time=now&key=$apiKey";
+    $ctx = stream_context_create(['http' => ['timeout' => 3.5]]);
+    $distResponse = @file_get_contents($distUrl, false, $ctx);
     if ($distResponse) {
         $distData = json_decode($distResponse, true);
-        if ($distData['status'] === 'OK' && !empty($distData['rows'][0]['elements'][0]['distance']['text'])) {
-            $distanceText = $distData['rows'][0]['elements'][0]['distance']['text'];
-            $cleanText = str_replace([',', ' '], '', explode(' ', $distanceText)[0]);
-            $distance_km = floatval($cleanText);
+        if (($distData['status'] ?? '') === 'OK' && !empty($distData['rows'][0]['elements'][0])) {
+            $el = $distData['rows'][0]['elements'][0];
+            if (($el['status'] ?? '') === 'OK') {
+                if ($distance_km <= 0 && !empty($el['distance']['text'])) {
+                    $cleanText = str_replace([',', ' '], '', explode(' ', $el['distance']['text'])[0]);
+                    $distance_km = floatval($cleanText);
+                }
+                $normSec = (int)($el['duration']['value'] ?? 0);
+                $trafSec = (int)($el['duration_in_traffic']['value'] ?? $normSec);
+                $trafficInfo = [
+                    'normal_duration_sec' => $normSec,
+                    'traffic_duration_sec' => $trafSec,
+                    'normal_duration_text' => $el['duration']['text'] ?? '',
+                    'traffic_duration_text' => $el['duration_in_traffic']['text'] ?? ($el['duration']['text'] ?? '')
+                ];
+            }
         }
     }
 }
-// 3. Fallback: Calculate distance from passed coordinates
+// 3. Fallback: Calculate distance and traffic from passed coordinates
 elseif ($fromLat !== null && $toLat !== null) {
-    $distUrl = "https://maps.googleapis.com/maps/api/distancematrix/json?origins=$fromLat,$fromLon&destinations=$toLat,$toLon&key=$apiKey";
-    $distResponse = @file_get_contents($distUrl);
+    $distUrl = "https://maps.googleapis.com/maps/api/distancematrix/json?origins=$fromLat,$fromLon&destinations=$toLat,$toLon&departure_time=now&key=$apiKey";
+    $ctx = stream_context_create(['http' => ['timeout' => 3.5]]);
+    $distResponse = @file_get_contents($distUrl, false, $ctx);
     if ($distResponse) {
         $distData = json_decode($distResponse, true);
-        if ($distData['status'] === 'OK' && !empty($distData['rows'][0]['elements'][0]['distance']['text'])) {
-            $distanceText = $distData['rows'][0]['elements'][0]['distance']['text'];
-            $cleanText = str_replace([',', ' '], '', explode(' ', $distanceText)[0]);
-            $distance_km = floatval($cleanText);
+        if (($distData['status'] ?? '') === 'OK' && !empty($distData['rows'][0]['elements'][0])) {
+            $el = $distData['rows'][0]['elements'][0];
+            if (($el['status'] ?? '') === 'OK') {
+                if ($distance_km <= 0 && !empty($el['distance']['text'])) {
+                    $cleanText = str_replace([',', ' '], '', explode(' ', $el['distance']['text'])[0]);
+                    $distance_km = floatval($cleanText);
+                }
+                $normSec = (int)($el['duration']['value'] ?? 0);
+                $trafSec = (int)($el['duration_in_traffic']['value'] ?? $normSec);
+                $trafficInfo = [
+                    'normal_duration_sec' => $normSec,
+                    'traffic_duration_sec' => $trafSec,
+                    'normal_duration_text' => $el['duration']['text'] ?? '',
+                    'traffic_duration_text' => $el['duration_in_traffic']['text'] ?? ($el['duration']['text'] ?? '')
+                ];
+            }
         }
     }
 }
@@ -96,14 +136,27 @@ elseif ($bookingId > 0) {
         $toAddress = urlencode($row['to_address']);
 
         if (!empty($row['from_address']) && !empty($row['to_address'])) {
-            $distUrl = "https://maps.googleapis.com/maps/api/distancematrix/json?origins=$fromAddress&destinations=$toAddress&key=$apiKey";
-            $distResponse = @file_get_contents($distUrl);
+            $distUrl = "https://maps.googleapis.com/maps/api/distancematrix/json?origins=$fromAddress&destinations=$toAddress&departure_time=now&key=$apiKey";
+            $ctx = stream_context_create(['http' => ['timeout' => 3.5]]);
+            $distResponse = @file_get_contents($distUrl, false, $ctx);
             if ($distResponse) {
                 $distData = json_decode($distResponse, true);
-                if ($distData['status'] === 'OK' && !empty($distData['rows'][0]['elements'][0]['distance']['text'])) {
-                    $distanceText = $distData['rows'][0]['elements'][0]['distance']['text'];
-                    $cleanText = str_replace([',', ' '], '', explode(' ', $distanceText)[0]);
-                    $distance_km = floatval($cleanText);
+                if (($distData['status'] ?? '') === 'OK' && !empty($distData['rows'][0]['elements'][0])) {
+                    $el = $distData['rows'][0]['elements'][0];
+                    if (($el['status'] ?? '') === 'OK') {
+                        if ($distance_km <= 0 && !empty($el['distance']['text'])) {
+                            $cleanText = str_replace([',', ' '], '', explode(' ', $el['distance']['text'])[0]);
+                            $distance_km = floatval($cleanText);
+                        }
+                        $normSec = (int)($el['duration']['value'] ?? 0);
+                        $trafSec = (int)($el['duration_in_traffic']['value'] ?? $normSec);
+                        $trafficInfo = [
+                            'normal_duration_sec' => $normSec,
+                            'traffic_duration_sec' => $trafSec,
+                            'normal_duration_text' => $el['duration']['text'] ?? '',
+                            'traffic_duration_text' => $el['duration_in_traffic']['text'] ?? ($el['duration']['text'] ?? '')
+                        ];
+                    }
                 }
             }
         }
@@ -201,7 +254,7 @@ if ($tripType === 'Local Taxi' || $tripType === 'Local-Taxi' || strtolower($trip
             $carType = $rule['car_type_label'];
             $carTypeId = (int)$rule['car_type_id'];
 
-            $calcRes = LocalTaxiFareCalculator::calculate($conn, $carType, $distance_km, $pickupTime);
+            $calcRes = LocalTaxiFareCalculator::calculate($conn, $carType, $distance_km, $pickupTime, [], $trafficInfo);
 
             $finalFare = (float)$calcRes['final_customer_fare'];
             
@@ -229,7 +282,12 @@ if ($tripType === 'Local Taxi' || $tripType === 'Local-Taxi' || strtolower($trip
                 'company_share_amount' => (string)number_format($calcRes['company_share_amount'], 2, '.', ''),
                 'driver_payout_amount' => (string)number_format($calcRes['driver_payout_amount'], 2, '.', ''),
                 'dynamic_pricing' => $calcRes['dynamic_pricing'] ?? null,
-                'time_surcharges' => $calcRes['time_surcharges'] ?? null
+                'time_surcharges' => $calcRes['time_surcharges'] ?? null,
+                'traffic_details' => $calcRes['traffic_details'] ?? null,
+                'traffic_surcharge' => (string)number_format($calcRes['traffic_surcharge'] ?? 0.0, 2, '.', ''),
+                'traffic_delay_min' => (int)($calcRes['traffic_details']['traffic_delay_min'] ?? 0),
+                'traffic_status' => $calcRes['traffic_details']['traffic_status'] ?? 'normal',
+                'traffic_status_message' => $calcRes['traffic_details']['status_message'] ?? 'Normal traffic conditions'
             ];
         }
 
@@ -239,17 +297,23 @@ if ($tripType === 'Local Taxi' || $tripType === 'Local-Taxi' || strtolower($trip
     }
 }
 
-// Fetch all trip costs for this tripType
-$sql = "SELECT * FROM tripCostTable WHERE tripType='$tripType' ORDER BY id ASC";
+// Normalize tripType for database lookup
+$lookupTripType = $tripType;
+if (strtolower($tripType) === 'round-trip' || strtolower($tripType) === 'roundtrip') {
+    $lookupTripType = 'Round-Trip';
+} elseif (strtolower($tripType) === 'local-duty' || strtolower($tripType) === 'localduty') {
+    $lookupTripType = 'Local-Duty';
+}
+
+// Fetch all trip costs for this tripType (case-insensitive and active only)
+$sql = "SELECT * FROM tripCostTable WHERE LOWER(tripType) = LOWER('$lookupTripType') AND (is_active = 1 OR is_active IS NULL) ORDER BY id ASC";
 $result = $conn->query($sql);
 
 $cars = [];
-$defaultCars = []; // Store first 5 rows with NULL coordinates
+$defaultCars = []; // Store default rows with NULL coordinates
 $found = false;    // Flag to check if coordinates match any bounding box
 
 if ($result && $result->num_rows > 0) {
-    $defaultCounter = 0;
-
     while ($row = $result->fetch_assoc()) {
         $hasCoords = $row['minLat'] !== null && $row['maxLat'] !== null && $row['minLon'] !== null && $row['maxLon'] !== null;
         $useRow = false;
@@ -269,10 +333,11 @@ if ($result && $result->num_rows > 0) {
             }
         }
 
-        // Collect first 5 default cars (with NULL coords)
-        if (!$hasCoords && $defaultCounter < 5) {
-            $defaultCars[$row['carType']] = $row;
-            $defaultCounter++;
+        // Collect all default cars (with NULL coords), deduplicating by carType
+        if (!$hasCoords) {
+            if (!isset($defaultCars[$row['carType']])) {
+                $defaultCars[$row['carType']] = $row;
+            }
         }
 
         if ($useRow) {

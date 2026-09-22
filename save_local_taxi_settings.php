@@ -25,6 +25,28 @@ function formatTime($t, $default) {
     return $t;
 }
 
+// Fast Toggle Action
+if (($data['action'] ?? '') === 'toggle_active') {
+    $carLabel = trim($data['carType'] ?? $data['car_type_label'] ?? '');
+    $isActive = isset($data['is_active']) ? ((int)$data['is_active'] ? 1 : 0) : 1;
+
+    if (!empty($carLabel)) {
+        $stmt = $conn->prepare("UPDATE `local_taxi_vehicle_rules` SET `is_active` = ? WHERE `car_type_label` = ?");
+        $stmt->bind_param("is", $isActive, $carLabel);
+        if ($stmt->execute()) {
+            $label = $isActive ? 'Unlocked (Active)' : 'Blocked (Hidden)';
+            echo json_encode([
+                'status' => 'success',
+                'message' => "Successfully {$label} {$carLabel} for Local Taxi.",
+                'carType' => $carLabel,
+                'is_active' => (bool)$isActive
+            ]);
+            $stmt->close();
+            exit;
+        }
+    }
+}
+
 // 1. Update Global Settings
 if (!empty($data['global_settings'])) {
     $g = $data['global_settings'];
@@ -40,6 +62,9 @@ if (!empty($data['global_settings'])) {
     $nStart = formatTime($g['night_start'] ?? '', '23:00:00');
     $nEnd = formatTime($g['night_end'] ?? '', '05:00:00');
     $nMult = (float)($g['night_multiplier'] ?? 1.20);
+    $trafActive = isset($g['traffic_pricing_active']) ? (!empty($g['traffic_pricing_active']) ? 1 : 0) : 1;
+    $trafGrace = isset($g['traffic_grace_minutes']) ? (int)$g['traffic_grace_minutes'] : 5;
+    $trafCap = isset($g['traffic_max_cap_minutes']) ? (int)$g['traffic_max_cap_minutes'] : 60;
     $gstActive = !empty($g['gst_active']) ? 1 : 0;
     $gstRate = (float)($g['gst_rate'] ?? 5.0);
     $cActive = !empty($g['company_share_active']) ? 1 : 0;
@@ -59,6 +84,9 @@ if (!empty($data['global_settings'])) {
         `night_start` = ?,
         `night_end` = ?,
         `night_multiplier` = ?,
+        `traffic_pricing_active` = ?,
+        `traffic_grace_minutes` = ?,
+        `traffic_max_cap_minutes` = ?,
         `gst_active` = ?,
         `gst_rate` = ?,
         `company_share_active` = ?,
@@ -69,9 +97,11 @@ if (!empty($data['global_settings'])) {
 
     $stmt = $conn->prepare($sql);
     if ($stmt) {
-        $stmt->bind_param("idissssdissdidisd", 
+        $stmt->bind_param("idissssdissdiiiidisd", 
             $dynActive, $sensitivity, $peakActive, $mStart, $mEnd, $eStart, $eEnd, $pMult,
-            $nightActive, $nStart, $nEnd, $nMult, $gstActive, $gstRate, $cActive, $cType, $cVal
+            $nightActive, $nStart, $nEnd, $nMult,
+            $trafActive, $trafGrace, $trafCap,
+            $gstActive, $gstRate, $cActive, $cType, $cVal
         );
         $stmt->execute();
         $stmt->close();
@@ -101,20 +131,31 @@ if (!empty($data['vehicles']) && is_array($data['vehicles'])) {
         $maxCeil = (float)($v['max_ceiling_rate'] ?? ($perKm * 1.5));
         $isActive = !empty($v['is_active']) ? 1 : 0;
 
-        $stmt = $conn->prepare("UPDATE `local_taxi_vehicle_rules` SET 
-            `base_fare` = ?,
-            `included_base_km` = ?,
-            `per_km_rate` = ?,
-            `waiting_charge_per_min` = ?,
-            `min_floor_rate` = ?,
-            `max_ceiling_rate` = ?,
-            `is_active` = ?
-            WHERE `car_type_label` = ?
-        ");
-        if ($stmt) {
-            $stmt->bind_param("ddddddis", $baseFare, $incKm, $perKm, $waitMin, $minFloor, $maxCeil, $isActive, $carLabel);
-            $stmt->execute();
-            $stmt->close();
+        $escLabel = mysqli_real_escape_string($conn, $carLabel);
+        $check = $conn->query("SELECT id FROM `local_taxi_vehicle_rules` WHERE `car_type_label` = '$escLabel' LIMIT 1");
+        if ($check && $check->num_rows > 0) {
+            $stmt = $conn->prepare("UPDATE `local_taxi_vehicle_rules` SET 
+                `base_fare` = ?,
+                `included_base_km` = ?,
+                `per_km_rate` = ?,
+                `waiting_charge_per_min` = ?,
+                `min_floor_rate` = ?,
+                `max_ceiling_rate` = ?,
+                `is_active` = ?
+                WHERE `car_type_label` = ?
+            ");
+            if ($stmt) {
+                $stmt->bind_param("ddddddis", $baseFare, $incKm, $perKm, $waitMin, $minFloor, $maxCeil, $isActive, $carLabel);
+                $stmt->execute();
+                $stmt->close();
+            }
+        } else {
+            $stmt = $conn->prepare("INSERT INTO `local_taxi_vehicle_rules` (`car_type_label`, `base_fare`, `included_base_km`, `per_km_rate`, `waiting_charge_per_min`, `min_floor_rate`, `max_ceiling_rate`, `is_active`, `display_order`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 10)");
+            if ($stmt) {
+                $stmt->bind_param("sddddddi", $carLabel, $baseFare, $incKm, $perKm, $waitMin, $minFloor, $maxCeil, $isActive);
+                $stmt->execute();
+                $stmt->close();
+            }
         }
     }
 }

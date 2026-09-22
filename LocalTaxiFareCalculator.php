@@ -29,11 +29,7 @@ class LocalTaxiFareCalculator
      */
     public static function getGlobalSettings(mysqli $conn): array
     {
-        $res = mysqli_query($conn, "SELECT * FROM `local_taxi_global_settings` WHERE `id` = 1 LIMIT 1");
-        if ($res && $row = mysqli_fetch_assoc($res)) {
-            return $row;
-        }
-        return [
+        $defaults = [
             'dynamic_pricing_active' => 1,
             'pricing_sensitivity' => 50.0,
             'peak_surge_active' => 1,
@@ -46,6 +42,9 @@ class LocalTaxiFareCalculator
             'night_start' => '23:00:00',
             'night_end' => '05:00:00',
             'night_multiplier' => 1.20,
+            'traffic_pricing_active' => 1,
+            'traffic_grace_minutes' => 5,
+            'traffic_max_cap_minutes' => 60,
             'gst_active' => 1,
             'gst_rate' => 5.00,
             'company_share_active' => 1,
@@ -53,6 +52,12 @@ class LocalTaxiFareCalculator
             'company_share_value' => 10.00,
             'is_active' => 1
         ];
+
+        $res = mysqli_query($conn, "SELECT * FROM `local_taxi_global_settings` WHERE `id` = 1 LIMIT 1");
+        if ($res && $row = mysqli_fetch_assoc($res)) {
+            return array_merge($defaults, $row);
+        }
+        return $defaults;
     }
 
     /**
@@ -79,6 +84,76 @@ class LocalTaxiFareCalculator
     }
 
     /**
+     * Evaluates Google Maps Live Traffic Delay and Surcharge
+     */
+    public static function evaluateTrafficDelay(array $global, array $vehRule, array $trafficInfo): array
+    {
+        $trafficActive = !isset($global['traffic_pricing_active']) || !empty($global['traffic_pricing_active']);
+        $graceMinutes = (float)($global['traffic_grace_minutes'] ?? 5.0);
+        $maxCapMinutes = (float)($global['traffic_max_cap_minutes'] ?? 60.0);
+        $ratePerMin = (float)($vehRule['waiting_charge_per_min'] ?? 2.00);
+
+        if (!$trafficActive || empty($trafficInfo)) {
+            return [
+                'active' => false,
+                'normal_duration_min' => 0,
+                'traffic_duration_min' => 0,
+                'traffic_delay_min' => 0,
+                'billable_traffic_min' => 0,
+                'grace_minutes' => (int)$graceMinutes,
+                'max_cap_minutes' => (int)$maxCapMinutes,
+                'rate_per_min' => $ratePerMin,
+                'traffic_surcharge' => 0.00,
+                'traffic_status' => 'normal',
+                'status_message' => 'Normal traffic conditions'
+            ];
+        }
+
+        $normalDurationSec = (int)($trafficInfo['normal_duration_sec'] ?? 0);
+        $trafficDurationSec = (int)($trafficInfo['traffic_duration_sec'] ?? $normalDurationSec);
+
+        $normalMin = (int)round($normalDurationSec / 60.0);
+        $trafficMin = (int)round($trafficDurationSec / 60.0);
+
+        if (isset($trafficInfo['traffic_delay_min'])) {
+            $delayMin = (int)round((float)$trafficInfo['traffic_delay_min']);
+        } else {
+            $delayMin = max(0, $trafficMin - $normalMin);
+        }
+
+        // Apply 5-minute free courtesy buffer
+        $billableMin = max(0.0, (float)$delayMin - $graceMinutes);
+        // Apply safety ceiling (max 60 mins)
+        $billableMin = min($billableMin, $maxCapMinutes);
+
+        $surcharge = round($billableMin * $ratePerMin, 2);
+
+        $status = 'normal';
+        $statusMsg = 'Normal traffic conditions';
+        if ($delayMin > 15) {
+            $status = 'heavy';
+            $statusMsg = "Heavy Traffic (+{$delayMin} mins delay)";
+        } elseif ($delayMin > 5) {
+            $status = 'moderate';
+            $statusMsg = "Moderate Traffic (+{$delayMin} mins delay)";
+        }
+
+        return [
+            'active' => true,
+            'normal_duration_min' => $normalMin,
+            'traffic_duration_min' => $trafficMin,
+            'traffic_delay_min' => $delayMin,
+            'billable_traffic_min' => (int)$billableMin,
+            'grace_minutes' => (int)$graceMinutes,
+            'max_cap_minutes' => (int)$maxCapMinutes,
+            'rate_per_min' => $ratePerMin,
+            'traffic_surcharge' => $surcharge,
+            'traffic_status' => $status,
+            'status_message' => $statusMsg
+        ];
+    }
+
+    /**
      * Calculates Local Taxi Fare
      */
     public static function calculate(
@@ -86,7 +161,8 @@ class LocalTaxiFareCalculator
         $carType,
         float $distanceKm,
         string $pickupTime = '',
-        array $settingsOverride = []
+        array $settingsOverride = [],
+        array $trafficInfo = []
     ): array {
         $global = self::getGlobalSettings($conn);
         if (!empty($settingsOverride)) {
@@ -119,7 +195,13 @@ class LocalTaxiFareCalculator
         $multiplier = $timeSurcharges['total_multiplier'];
 
         $subtotalAfterSurcharges = $subtotalBeforeSurcharges * $multiplier;
-        $subtotalP = self::toPaise($subtotalAfterSurcharges);
+
+        // 4b. Real-Time Google Maps Traffic Surcharge
+        $trafficDetails = self::evaluateTrafficDelay($global, $vehRule, $trafficInfo);
+        $trafficSurcharge = (float)($trafficDetails['traffic_surcharge'] ?? 0.00);
+
+        $subtotalAfterTraffic = $subtotalAfterSurcharges + $trafficSurcharge;
+        $subtotalP = self::toPaise($subtotalAfterTraffic);
 
         // 5. GST Tax (5%)
         $gstRate = !empty($global['gst_active']) ? (float)($global['gst_rate'] ?? 5.00) : 0.0;
@@ -150,6 +232,8 @@ class LocalTaxiFareCalculator
             'excess_km'              => $excessKm,
             'excess_km_charge'       => round($excessCharge, 2),
             'time_surcharges'        => $timeSurcharges,
+            'traffic_details'        => $trafficDetails,
+            'traffic_surcharge'      => $trafficSurcharge,
             'subtotal_fare'          => self::fromPaise($subtotalP),
             'gst_rate'               => $gstRate,
             'gst_amount'             => self::fromPaise($gstP),
