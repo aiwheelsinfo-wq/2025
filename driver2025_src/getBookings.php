@@ -118,7 +118,7 @@ try {
             users AS u ON b.mobile = u.phone_number
         WHERE 
             (b.vender_id = ? OR b.driver_id = ?) 
-            AND (b.booking_status = 'Accepted' OR b.booking_status = 'Started')
+            AND (b.booking_status = 'Accepted' OR b.booking_status = 'Started' OR b.booking_status = 'In-Transit')
         ORDER BY 
             b.date ASC
     ";
