@@ -213,29 +213,44 @@ try {
         $user_stmt->close();
     }
 
-    // Calculate Local Taxi Company Commission dynamically from settings
+    // Calculate Local Taxi Company Commission and GST dynamically from settings
     $agni_amount = 0.00;
-    $commRes = $conn->query("SELECT company_share_active, company_share_type, company_share_value FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+    $vendor_amount = $total_amount;
+    $gstActive = 1;
+    $gstRate = 5.00;
+    $cActive = 1;
+    $cType = 'percent';
+    $cVal = 10.00;
+
+    $commRes = $conn->query("SELECT company_share_active, company_share_type, company_share_value, gst_active, gst_rate FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
     if ($commRes && $commRow = $commRes->fetch_assoc()) {
-        if (!empty($commRow['company_share_active'])) {
-            $cType = $commRow['company_share_type'] ?? 'percent';
-            $cVal = (float)($commRow['company_share_value'] ?? 10.00);
-            if ($cType === 'flat') {
-                $agni_amount = round(min($total_amount, $cVal), 2);
-            } else {
-                $agni_amount = round($total_amount * ($cVal / 100.0), 2);
-            }
-        }
-    } else {
-        $agni_amount = round($total_amount * 0.10, 2);
+        $cActive = !empty($commRow['company_share_active']);
+        $cType = $commRow['company_share_type'] ?? 'percent';
+        $cVal = (float)($commRow['company_share_value'] ?? 10.00);
+        $gstActive = !empty($commRow['gst_active']);
+        $gstRate = (float)($commRow['gst_rate'] ?? 5.00);
     }
-    $vendor_amount = max(0.00, round($total_amount - $agni_amount, 2));
+
+    $preTaxBase = ($gstActive && $gstRate > 0) ? round($total_amount / (1 + ($gstRate / 100.0)), 2) : $total_amount;
+    $gstAmt = max(0.00, round($total_amount - $preTaxBase, 2));
+
+    $commAmt = 0.00;
+    if ($cActive) {
+        if ($cType === 'flat') {
+            $commAmt = round(min($preTaxBase, $cVal), 2);
+        } else {
+            $commAmt = round($preTaxBase * ($cVal / 100.0), 2);
+        }
+    }
+
+    $agni_amount = round($commAmt + $gstAmt, 2);
+    $vendor_amount = max(0.00, round($preTaxBase - $commAmt, 2));
 
     // ✅ Insert booking
     $booking_sql = "INSERT INTO bookings (
-        from_address, to_address, distance, car_type, total_amount, trip_type,
+        from_address, to_address, distance, car_type, total_amount, base_charge, trip_type,
         date, time, mobile, otp, vendor_amount, agni_amount, booker_id, booking_status
-    ) VALUES (?, ?, ?, ?, ?, 'Local-taxi', ?, ?, ?, ?, ?, ?, ?, ?)";
+    ) VALUES (?, ?, ?, ?, ?, ?, 'Local-taxi', ?, ?, ?, ?, ?, ?, ?, ?)";
 
     $booking_stmt = $conn->prepare($booking_sql);
     if (!$booking_stmt) {
@@ -243,12 +258,13 @@ try {
     }
 
     $booking_stmt->bind_param(
-        'ssdsdssssddss',
+        'ssdsddssssddss',
         $from_address,
         $to_address,
         $distance,
         $car_type,
         $total_amount,
+        $preTaxBase,
         $current_date,
         $current_time,
         $booking_number,

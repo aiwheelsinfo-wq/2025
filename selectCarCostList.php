@@ -43,7 +43,7 @@ $fromLon = isset($_GET['fromLng']) ? floatval($_GET['fromLng']) : null;
 $toLat   = isset($_GET['toLat']) ? floatval($_GET['toLat']) : null;
 $toLon   = isset($_GET['toLng']) ? floatval($_GET['toLng']) : null;
 
-$distance_km = 100; // Default fallback distance in km
+$distance_km = 0; // Will be determined from $_GET['distance'] or Google Distance Matrix
 $apiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM';
 
 $rawFromAddress = $_GET['fromAddress'] ?? $_GET['from_address'] ?? '';
@@ -64,8 +64,8 @@ if (isset($_GET['trafficDelayMin']) && is_numeric($_GET['trafficDelayMin'])) {
 
 $isLocalTaxi = ($tripType === 'Local Taxi' || $tripType === 'Local-Taxi' || strtolower($tripType) === 'local taxi');
 
-// 1. Explicit distance passed by frontend
-if (isset($_GET['distance']) && floatval($_GET['distance']) > 0 && floatval($_GET['distance']) < 900) {
+// 1. Explicit distance passed by frontend (ignore dummy placeholder 999)
+if (isset($_GET['distance']) && floatval($_GET['distance']) > 0 && floatval($_GET['distance']) != 999) {
     $distance_km = floatval($_GET['distance']);
 }
 
@@ -164,9 +164,23 @@ elseif ($bookingId > 0) {
     if ($stmt) $stmt->close();
 }
 
+// Fallback to 100 km only if distance could not be determined from frontend or Google API
+if ($distance_km <= 0) {
+    $distance_km = 100;
+}
+
 // -------------------------------------------------------------
 // ONE-WAY DYNAMIC PRICING & FARE CALCULATION ENGINE
 // -------------------------------------------------------------
+// Load Category Images Map
+$categoryImages = [];
+$catImgRes = mysqli_query($conn, "SELECT car_type, image_url FROM car_categories WHERE image_url IS NOT NULL AND image_url != ''");
+if ($catImgRes) {
+    while ($ci = mysqli_fetch_assoc($catImgRes)) {
+        $categoryImages[strtoupper(trim($ci['car_type']))] = trim($ci['image_url']);
+    }
+}
+
 if ($tripType === 'One-way') {
     require_once __DIR__ . '/OneWayFareCalculator.php';
     require_once __DIR__ . '/MigrationRunner.php';
@@ -208,13 +222,15 @@ if ($tripType === 'One-way') {
 
             $cars[$carType] = [
                 'carType' => $carType,
+                'imageUrl' => $categoryImages[strtoupper(trim($carType))] ?? '',
                 'kmRate' => (string)$calcRes['km_rate'],
                 'baseAmount' => (string)number_format($staticFare, 2, '.', ''),
-                'extraKMAmount' => (string)($meta['extraKMAmount'] ?? $calcRes['km_rate']),
+                'extraKMAmount' => (string)((!empty($meta['extraKMAmount']) && floatval($meta['extraKMAmount']) > 0) ? $meta['extraKMAmount'] : $calcRes['km_rate']),
                 'extraHoursAmount' => (string)($meta['extraHoursAmount'] ?? 0),
                 'packageKm' => round($distance_km),
                 'packageHours' => (string)($meta['packageHours'] ?? '0'),
                 'gstPercent' => (string)$calcRes['gst_breakdown']['rate'],
+                'gstActive' => !empty($calcRes['gst_breakdown']['is_active']) ? 1 : 0,
                 'driverAllowance' => (string)number_format($calcRes['driver_allowance'], 2, '.', ''),
                 'driverAllowanceActive' => $calcRes['driver_allowance_active'] ? 1 : 0,
                 'tollCharge' => (string)number_format($calcRes['toll_charge'], 2, '.', ''),
@@ -265,6 +281,7 @@ if ($tripType === 'Local Taxi' || $tripType === 'Local-Taxi' || strtolower($trip
 
             $cars[$carType] = [
                 'carType' => $carType,
+                'imageUrl' => $categoryImages[strtoupper(trim($carType))] ?? '',
                 'kmRate' => (string)$calcRes['effective_km_rate'],
                 'baseAmount' => (string)number_format($marketBaseline, 2, '.', ''),
                 'extraKMAmount' => (string)$calcRes['effective_km_rate'],
@@ -377,6 +394,7 @@ if ($result && $result->num_rows > 0) {
 
             $cars[$row['carType']] = [
                 'carType' => $row['carType'],
+                'imageUrl' => $categoryImages[strtoupper(trim($row['carType']))] ?? '',
                 'kmRate' => $row['kmRate'],
                 'baseAmount' => number_format($standardPrice, 0, '.', ''),
                 'extraKMAmount' => $row['extraKMAmount'],
@@ -433,6 +451,7 @@ if ($result && $result->num_rows > 0) {
 
             $cars[$row['carType']] = [
                 'carType' => $row['carType'],
+                'imageUrl' => $categoryImages[strtoupper(trim($row['carType']))] ?? '',
                 'kmRate' => $row['kmRate'],
                 'baseAmount' => number_format($standardPrice, 0, '.', ''),
                 'extraKMAmount' => $row['extraKMAmount'],
@@ -449,6 +468,7 @@ if ($result && $result->num_rows > 0) {
             ];
         }
     }
+    
 }
 
 echo json_encode(array_values($cars), JSON_PRETTY_PRINT);

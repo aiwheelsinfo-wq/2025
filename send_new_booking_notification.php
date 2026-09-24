@@ -238,22 +238,36 @@ function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon
         }
     }
 
-    // 🔥 Recalculate vendor_amount live for Local-Duty based on admin setting
+    // 🔥 Recalculate vendor_amount live for Local-Duty based on admin setting (Base fare minus dynamic commission)
     if ((stripos($trip_type, 'duty') !== false) && !empty($booking['total_amount'])) {
         $totAmt = floatval($booking['total_amount']);
-        $dShare = 10.00;
+        $baseAmt = floatval($booking['base_charge'] ?? 0);
+        if ($baseAmt <= 0 && $totAmt > 0) {
+            $baseAmt = round($totAmt / 1.05, 2);
+        }
+        
+        $dShare = 5.00;
+        $dActive = 1;
+        $dType = 'percent';
         try {
-            $gS = $conn->query("SELECT company_share_value, company_share_active FROM local_duty_global_settings WHERE id = 1 LIMIT 1");
+            $gS = $conn->query("SELECT company_share_value, company_share_active, company_share_type FROM local_duty_global_settings WHERE id = 1 LIMIT 1");
             if ($gS && $gR = $gS->fetch_assoc()) {
-                if (!empty($gR['company_share_active'])) {
-                    $dShare = (float)($gR['company_share_value'] ?? 10.00);
-                } else {
-                    $dShare = 0.00;
-                }
+                $dActive = (int)($gR['company_share_active'] ?? 1);
+                $dShare = (float)($gR['company_share_value'] ?? 5.00);
+                $dType = $gR['company_share_type'] ?? 'percent';
             }
         } catch (Throwable $e) {}
-        if ($totAmt > 0) {
-            $vendor_amount = (string)max(0.00, round($totAmt - ($totAmt * ($dShare / 100.0)), 2));
+        
+        if ($baseAmt > 0) {
+            $commAmt = 0.00;
+            if ($dActive) {
+                if ($dType === 'flat') {
+                    $commAmt = round($dShare, 2);
+                } else {
+                    $commAmt = round($baseAmt * ($dShare / 100.0), 2);
+                }
+            }
+            $vendor_amount = (string)max(0.00, round($baseAmt - $commAmt, 2));
         }
     }
 

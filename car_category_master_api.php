@@ -45,10 +45,58 @@ function sendJson($status, $message, $extra = []) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// 0. UPLOAD CAR CATEGORY IMAGE
+// ─────────────────────────────────────────────────────────────
+if ($action === 'upload_image') {
+    if (empty($_FILES['image']) && empty($_FILES['car_image'])) {
+        sendJson('error', 'No image file uploaded');
+    }
+    $file = $_FILES['image'] ?? $_FILES['car_image'];
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        sendJson('error', 'Upload failed with error code: ' . $file['error']);
+    }
+
+    $allowedExts = ['jpg', 'jpeg', 'png', 'webp', 'svg'];
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, $allowedExts)) {
+        sendJson('error', 'Invalid file type. Only JPG, PNG, WEBP, and SVG are allowed.');
+    }
+
+    if ($file['size'] > 5 * 1024 * 1024) {
+        sendJson('error', 'File size exceeds 5MB limit.');
+    }
+
+    $uploadDir = '/var/www/html/admin2025/uploads/cars/';
+    if (!file_exists($uploadDir)) {
+        @mkdir($uploadDir, 0775, true);
+    }
+
+    $carSlug = !empty($params['car_type']) ? strtolower(preg_replace('/[^a-zA-Z0-9]/', '_', $params['car_type'])) : 'car';
+    $fileName = $carSlug . '_' . time() . '_' . substr(md5(uniqid()), 0, 6) . '.' . $ext;
+    $targetPath = $uploadDir . $fileName;
+
+    if (move_uploaded_file($file['tmp_name'], $targetPath)) {
+        @chmod($targetPath, 0664);
+        $host = $_SERVER['HTTP_HOST'] ?? 'agnicarrental.com';
+        if ($host === 'localhost' || $host === '127.0.0.1') {
+            $host = 'agnicarrental.com';
+        }
+        $publicUrl = "https://{$host}/admin2025/uploads/cars/{$fileName}";
+
+        sendJson('success', 'Image uploaded successfully', [
+            'image_url' => $publicUrl,
+            'filename' => $fileName
+        ]);
+    } else {
+        sendJson('error', 'Failed to move uploaded file to target directory.');
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
 // 1. GET ALL CATEGORIES WITH MULTI-TRIP FARES
 // ─────────────────────────────────────────────────────────────
 if ($action === 'get_all') {
-    $catQuery = "SELECT id, car_type, status FROM car_categories ORDER BY car_type ASC";
+    $catQuery = "SELECT id, car_type, image_url, status FROM car_categories ORDER BY car_type ASC";
     $catRes = mysqli_query($conn, $catQuery);
     $categories = [];
     $catMap = [];
@@ -59,6 +107,7 @@ if ($action === 'get_all') {
             $catMap[$cName] = [
                 'id' => (int)$row['id'],
                 'car_type' => $cName,
+                'image_url' => $row['image_url'] ?? '',
                 'status' => $row['status'] ?? 'active',
                 'oneway' => null,
                 'roundtrip' => null,
@@ -150,16 +199,18 @@ if ($action === 'add_category') {
     $existing = $checkStmt->get_result()->fetch_assoc();
     $checkStmt->close();
 
+    $image_url = trim($params['image_url'] ?? '');
+
     $catId = 0;
     if ($existing) {
         $catId = (int)$existing['id'];
-        $upStmt = $conn->prepare("UPDATE car_categories SET status = 'active' WHERE id = ?");
-        $upStmt->bind_param("i", $catId);
+        $upStmt = $conn->prepare("UPDATE car_categories SET status = 'active', image_url = CASE WHEN ? != '' THEN ? ELSE image_url END WHERE id = ?");
+        $upStmt->bind_param("ssi", $image_url, $image_url, $catId);
         $upStmt->execute();
         $upStmt->close();
     } else {
-        $insStmt = $conn->prepare("INSERT INTO car_categories (car_type, status) VALUES (?, 'active')");
-        $insStmt->bind_param("s", $car_type);
+        $insStmt = $conn->prepare("INSERT INTO car_categories (car_type, image_url, status) VALUES (?, ?, 'active')");
+        $insStmt->bind_param("ss", $car_type, $image_url);
         $insStmt->execute();
         $catId = $conn->insert_id;
         $insStmt->close();
@@ -306,7 +357,31 @@ if ($action === 'update_fares') {
         $stmt->close();
     }
 
-    sendJson('success', "Fares for '{$car_type}' updated successfully!");
+    if (isset($params['image_url'])) {
+        $img = trim($params['image_url']);
+        $upImgStmt = $conn->prepare("UPDATE car_categories SET image_url = ? WHERE UPPER(car_type) = ?");
+        $upImgStmt->bind_param("ss", $img, $car_type);
+        $upImgStmt->execute();
+        $upImgStmt->close();
+    }
+
+    sendJson('success', "Fares and details for '{$car_type}' updated successfully!");
+}
+
+// ─────────────────────────────────────────────────────────────
+// 3.1 UPDATE IMAGE ONLY
+// ─────────────────────────────────────────────────────────────
+if ($action === 'update_image') {
+    $car_type = strtoupper(trim($params['car_type'] ?? ''));
+    $image_url = trim($params['image_url'] ?? '');
+    if (empty($car_type)) {
+        sendJson('error', 'Category name required');
+    }
+    $stmt = $conn->prepare("UPDATE car_categories SET image_url = ? WHERE UPPER(car_type) = ?");
+    $stmt->bind_param("ss", $image_url, $car_type);
+    $stmt->execute();
+    $stmt->close();
+    sendJson('success', "Image updated for {$car_type}", ['image_url' => $image_url]);
 }
 
 // ─────────────────────────────────────────────────────────────

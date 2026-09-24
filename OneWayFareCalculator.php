@@ -124,6 +124,8 @@ class OneWayFareCalculator {
                 $gstBreakdown['mode'] = 'flat';
                 $gstBreakdown['rate'] = $gstPercent;
             }
+        } else {
+            $gstBreakdown['rate'] = 0.0;
         }
 
         $grossTotalP = $subtotalP + $gstP;

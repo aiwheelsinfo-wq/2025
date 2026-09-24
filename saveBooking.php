@@ -115,22 +115,37 @@ $vendor_amount = $_POST['vendor_amount'] ?? '';
 
 // 🔥 Dynamic Platform Commission Calculation for Local-Duty based on live Admin Settings
 if (strcasecmp($trip_type, 'Local-Duty') === 0 || strcasecmp($trip_type, 'Local Duty') === 0 || stripos($trip_type, 'Local-duty') !== false) {
-    $dutySharePercent = 10.00;
+    $dutySharePercent = 5.00;
+    $dutyShareActive = 1;
+    $dutyShareType = 'percent';
     try {
-        $gStmt = $conn->query("SELECT company_share_value, company_share_active FROM local_duty_global_settings WHERE id = 1 LIMIT 1");
+        $gStmt = $conn->query("SELECT company_share_value, company_share_active, company_share_type FROM local_duty_global_settings WHERE id = 1 LIMIT 1");
         if ($gStmt && $gRow = $gStmt->fetch_assoc()) {
-            if (!empty($gRow['company_share_active'])) {
-                $dutySharePercent = (float)($gRow['company_share_value'] ?? 10.00);
-            } else {
-                $dutySharePercent = 0.00;
-            }
+            $dutyShareActive = (int)($gRow['company_share_active'] ?? 1);
+            $dutySharePercent = (float)($gRow['company_share_value'] ?? 5.00);
+            $dutyShareType = $gRow['company_share_type'] ?? 'percent';
         }
     } catch (Throwable $e) {}
 
     $totVal = floatval($total_amount);
-    if ($totVal > 0) {
-        $agniCalc = round($totVal * ($dutySharePercent / 100.0), 2);
-        $vendorCalc = max(0.00, round($totVal - $agniCalc, 2));
+    $baseVal = floatval($base_charge);
+    if ($baseVal <= 0 && $totVal > 0) {
+        $baseVal = round($totVal / 1.05, 2);
+    }
+    
+    if ($baseVal > 0) {
+        $gstAmt = round($baseVal * 0.05, 2);
+        $commAmt = 0.00;
+        if ($dutyShareActive) {
+            if ($dutyShareType === 'flat') {
+                $commAmt = round($dutySharePercent, 2);
+            } else {
+                $commAmt = round($baseVal * ($dutySharePercent / 100.0), 2);
+            }
+        }
+        $vendorCalc = max(0.00, round($baseVal - $commAmt, 2));
+        $agniCalc = round($commAmt + $gstAmt, 2);
+        
         $agni_amount = (string)$agniCalc;
         $vendor_amount = (string)$vendorCalc;
     }

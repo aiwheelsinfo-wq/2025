@@ -267,13 +267,17 @@ try {
     }
 
     while ($stmtPending->fetch()) {
-        // Dynamically compute vendor_amount for Local-Duty based on live admin commission
+        // Dynamically compute vendor_amount for Local-Duty based on live admin commission on baseAmount (excluding 5% GST)
         if (stripos($trip_type, 'duty') !== false && $ldActive) {
             $tAmount = (float)$total_amount;
+            $bAmount = (float)($baseAmount ?? 0);
+            if ($bAmount <= 0 && $tAmount > 0) {
+                $bAmount = round($tAmount / 1.05, 2);
+            }
             if ($ldType === 'flat') {
-                $vendor_amount = max(0, $tAmount - $ldCommission);
+                $vendor_amount = max(0, round($bAmount - $ldCommission, 2));
             } else {
-                $vendor_amount = max(0, round($tAmount - ($tAmount * ($ldCommission / 100)), 2));
+                $vendor_amount = max(0, round($bAmount - ($bAmount * ($ldCommission / 100)), 2));
             }
         }
 

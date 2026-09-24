@@ -172,6 +172,15 @@ if ($tripType === 'One-way') {
         }
     }
 }
+
+if (stripos($tripType, 'taxi') !== false) {
+    $ltQ = $conn->query("SELECT gst_active, gst_rate FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+    if ($ltQ && $ltR = $ltQ->fetch_assoc()) {
+        $data['gstPercent'] = !empty($ltR['gst_active']) ? (string)floatval($ltR['gst_rate'] ?? 5.0) : '0';
+    } else {
+        $data['gstPercent'] = '5.0';
+    }
+}
 // Step 5: Fetch active discount for this trip type
 $data['discount_type'] = null;
 $data['discount_value'] = 0;

@@ -30,7 +30,7 @@ if ($action === 'get_booking_details') {
         exit;
     }
 
-    $stmt = $conn->prepare("SELECT from_address, to_address FROM bookings WHERE id = ?");
+    $stmt = $conn->prepare("SELECT from_address, to_address, trip_type, booking_status, otp, end_otp, gps_accumulated_km FROM bookings WHERE id = ?");
     $stmt->bind_param("s", $booking_id);
 
     if ($stmt->execute()) {
@@ -41,6 +41,11 @@ if ($action === 'get_booking_details') {
                 'success' => true,
                 'from_address' => $row['from_address'],
                 'to_address' => $row['to_address'],
+                'trip_type' => $row['trip_type'],
+                'booking_status' => $row['booking_status'],
+                'otp' => $row['otp'],
+                'end_otp' => $row['end_otp'] ?? '',
+                'gps_accumulated_km' => floatval($row['gps_accumulated_km'] ?? 0),
             ]);
         } else {
             echo json_encode(['success' => false, 'message' => 'Booking not found.']);
@@ -97,6 +102,9 @@ else if ($action === 'get_booking_otp') {
     SELECT 
     b.trip_type, 
     b.otp, 
+    b.end_otp,
+    b.gps_accumulated_km,
+    b.booking_status,
     b.date, 
     b.time, 
     b.return_date, 
@@ -147,6 +155,9 @@ else if ($action === 'get_booking_otp') {
                 'success' => true,
                 'trip_type' => $row['trip_type'],
                 'otp' => $row['otp'],
+                'end_otp' => $row['end_otp'] ?? '',
+                'gps_accumulated_km' => floatval($row['gps_accumulated_km'] ?? 0),
+                'booking_status' => $row['booking_status'] ?? '',
                 'date' => $row['date'],
                 'time' => $row['time'],
                 'return_date' => $row['return_date'],

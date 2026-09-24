@@ -160,26 +160,55 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Round-
         ]);
     }
 } else if (strcasecmp($trip_type, 'Local-Duty') === 0 || strcasecmp($trip_type, 'Local Duty') === 0 || strcasecmp($trip_type, 'Local-duty') === 0) {
-    // 1. Calculate dynamic Commission on Total Amount (10% default or admin configured) + 5% GST
-    $companySharePercent = 10.00;
+    // 1. Calculate dynamic Commission on Pre-Tax Base Amount + 5% GST
+    $companySharePercent = 5.00;
+    $companyShareActive = 1;
+    $companyShareType = 'percent';
     try {
-        $gStmt = $conn->query("SELECT company_share_value, company_share_active FROM local_duty_global_settings WHERE id = 1 LIMIT 1");
+        $gStmt = $conn->query("SELECT company_share_value, company_share_active, company_share_type FROM local_duty_global_settings WHERE id = 1 LIMIT 1");
         if ($gStmt && $gRow = $gStmt->fetch_assoc()) {
-            if (!empty($gRow['company_share_active'])) {
-                $companySharePercent = (float)($gRow['company_share_value'] ?? 10.00);
-            }
+            $companyShareActive = (int)($gRow['company_share_active'] ?? 1);
+            $companySharePercent = (float)($gRow['company_share_value'] ?? 5.00);
+            $companyShareType = $gRow['company_share_type'] ?? 'percent';
         }
     } catch (Throwable $e) {}
 
-    $commissionAmount = round(($total_amount * ($companySharePercent / 100.0)), 2);
-    $gstAmount = round(($total_amount * 0.05), 2);
-    $totalDeductionAmount = round($commissionAmount + $gstAmount, 2);
+    // Pre-tax base fare (exclude toll, parking, permit which are pass-through)
+    $preTaxWithExtra = ($total_amount - $toll_charge - $parking_charge - $permit_charge);
+    $preTaxBase = ($preTaxWithExtra > 0) ? round($preTaxWithExtra / 1.05, 2) : 0.0;
+    $gstAmount = max(0.0, round($preTaxWithExtra - $preTaxBase, 2));
 
+    $commissionAmount = 0.0;
+    if ($companyShareActive) {
+        if ($companyShareType === 'flat') {
+            $commissionAmount = round($companySharePercent, 2);
+        } else {
+            $commissionAmount = round(($preTaxBase * ($companySharePercent / 100.0)), 2);
+        }
+    }
+
+    $totalDeductionAmount = round($commissionAmount + $gstAmount, 2);
     $agni_amount = $totalDeductionAmount;
-    $vendor_amount = max(0, $total_amount - $totalDeductionAmount);
+    $vendor_amount = max(0, round(($preTaxBase - $commissionAmount) + $toll_charge + $parking_charge + $permit_charge, 2));
+
+    // End OTP validation for Local-Duty (prevents driver from completing trip without customer present)
+    $enteredEndOtp = trim($_POST['end_otp'] ?? $_POST['otp'] ?? '');
+    if (!empty($enteredEndOtp) && !empty($booking_id)) {
+        $chkOtpQ = $conn->query("SELECT end_otp, otp FROM bookings WHERE id = '" . mysqli_real_escape_string($conn, $booking_id) . "' LIMIT 1");
+        if ($chkOtpQ && $cRow = $chkOtpQ->fetch_assoc()) {
+            $expectedOtp = trim(!empty($cRow['end_otp']) ? $cRow['end_otp'] : $cRow['otp']);
+            if (!empty($expectedOtp) && $enteredEndOtp !== $expectedOtp) {
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Invalid End OTP. Please enter the correct 4-digit OTP provided by the customer at drop-off.'
+                ]);
+                exit;
+            }
+        }
+    }
 
     // Prepare and bind
-    $stmt = $conn->prepare("UPDATE bookings SET booking_status = ?, closing_km = ?, closing_date = ?, closing_time = ?, total_amount = ?, vendor_amount = ?, agni_amount = ?, agent_commission = ?, invoice_no = ?, invoice_date = ?, toll_charge = ?, parking_charge = ?, permit_charge = ? WHERE id = ?");
+    $stmt = $conn->prepare("UPDATE bookings SET booking_status = ?, closing_km = ?, closing_date = ?, closing_time = ?, total_amount = ?, vendor_amount = ?, agni_amount = ?, agent_commission = ?, invoice_no = ?, invoice_date = ?, toll_charge = ?, parking_charge = ?, permit_charge = ?, gps_end_time = NOW() WHERE id = ?");
     $stmt->bind_param("sissddddssddds", $status, $closing_km, $closing_date, $closing_time, $total_amount, $vendor_amount, $agni_amount, $agent_commission, $next_invoice_no, $invoice_date, $toll_charge, $parking_charge, $permit_charge, $booking_id);
 
     if ($stmt->execute()) {
@@ -285,27 +314,26 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Round-
         }
     }
 
-    // 3. Calculate dynamic commission amount + 5% GST
+    // 3. Calculate dynamic commission amount + 5% GST (One-Way total_amount is already GST inclusive)
     $basisAmount = ($total_amount > 0) ? $total_amount : (($base_charge > 0) ? $base_charge : 0);
     $base_charge = $basisAmount;
+
+    $preTaxSubtotal = round($basisAmount / 1.05, 2);
+    $gstAmount = round($basisAmount - $preTaxSubtotal, 2);
+
+    $commissionBasis = ($companyShareBasis === 'base_km') ? $preTaxSubtotal : $preTaxSubtotal;
     $commissionAmount = 0.00;
     if ($companyShareActive) {
         if ($companyShareType === 'fixed') {
-            $commissionAmount = round(min($basisAmount, $companyShareValue), 2);
+            $commissionAmount = round(min($commissionBasis, $companyShareValue), 2);
         } else {
-            $commissionAmount = round($basisAmount * ($companyShareValue / 100.0), 2);
+            $commissionAmount = round($commissionBasis * ($companyShareValue / 100.0), 2);
         }
     }
 
-    $gstAmount = round($basisAmount * 0.05, 2);
     $totalDeductionAmount = round($commissionAmount + $gstAmount, 2);
-
-    if ($agni_amount === null || $agni_amount <= 0) {
-        $agni_amount = $totalDeductionAmount;
-    }
-    if ($vendor_amount === null || $vendor_amount <= 0) {
-        $vendor_amount = max(0, $basisAmount - $commissionAmount);
-    }
+    $agni_amount = $totalDeductionAmount;
+    $vendor_amount = max(0, round($basisAmount - $totalDeductionAmount, 2));
 
     // Prepare and bind
     $stmt = $conn->prepare("UPDATE bookings SET booking_status = ?, closing_km = ?, closing_date = ?, closing_time = ? ,invoice_no = ?, invoice_date = ?, toll_charge = ?, parking_charge =? , permit_charge =?, total_amount = ?, vendor_amount =?, agni_amount =? ,base_charge=? WHERE id = ?");
@@ -377,19 +405,28 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Round-
         ]);
     }
 } else if (strcasecmp($trip_type, 'Local-taxi') === 0 || strcasecmp($trip_type, 'Local taxi') === 0) {
-    // 1. Fetch dynamic commission percentage from local_taxi_global_settings
+    // 1. Fetch dynamic commission and GST from local_taxi_global_settings
     $companySharePercent = 10.00;
-    $gStmt = $conn->query("SELECT company_share_value, company_share_active FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
+    $gstActive = 1;
+    $gstRate = 5.00;
+    $gStmt = $conn->query("SELECT company_share_value, company_share_active, gst_active, gst_rate FROM local_taxi_global_settings WHERE id = 1 LIMIT 1");
     if ($gStmt && $gRow = $gStmt->fetch_assoc()) {
         if (!empty($gRow['company_share_active'])) {
             $companySharePercent = (float)($gRow['company_share_value'] ?? 10.00);
         }
+        $gstActive = (int)($gRow['gst_active'] ?? 1);
+        $gstRate = (float)($gRow['gst_rate'] ?? 5.00);
     }
 
-    // 2. Calculate dynamic commission amount
-    $commissionAmount = round(($total_amount * ($companySharePercent / 100.0)), 2);
-    $agni_amount = $commissionAmount;
-    $vendor_amount = max(0, $total_amount - $commissionAmount);
+    $preTaxWithExtra = ($total_amount - $toll_charge - $parking_charge - $permit_charge);
+    $preTaxBase = ($gstActive && $gstRate > 0 && $preTaxWithExtra > 0) ? round($preTaxWithExtra / (1 + ($gstRate / 100.0)), 2) : $preTaxWithExtra;
+    $gstAmount = max(0.0, round($preTaxWithExtra - $preTaxBase, 2));
+
+    $commissionAmount = round(($preTaxBase * ($companySharePercent / 100.0)), 2);
+    $totalDeductionAmount = round($commissionAmount + $gstAmount, 2);
+
+    $agni_amount = $totalDeductionAmount;
+    $vendor_amount = max(0, round(($preTaxBase - $commissionAmount) + $toll_charge + $parking_charge + $permit_charge, 2));
 
     // Prepare and bind - update total_amount, vendor_amount, and agni_amount
     $stmt = $conn->prepare("UPDATE bookings SET booking_status = ?, closing_km = ?, closing_date = ?, closing_time = ?, total_amount = ?, vendor_amount = ?, agni_amount = ?, invoice_no = ?, invoice_date = ?, toll_charge =?, parking_charge =?, permit_charge =? WHERE id = ?");
@@ -397,24 +434,24 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Round-
 
     // Execute
     if ($stmt->execute()) {
-        // 3. Deduct commission from Vendor Prepaid Wallet
+        // 3. Deduct commission and GST from Vendor/Driver Prepaid Wallet
         $vPhone = '';
         $bQ = $conn->query("SELECT vender_id, driver_id FROM bookings WHERE id = '" . mysqli_real_escape_string($conn, $booking_id) . "' LIMIT 1");
         if ($bQ && $brow = $bQ->fetch_assoc()) {
             $vPhone = !empty($brow['vender_id']) ? $brow['vender_id'] : ($brow['driver_id'] ?? '');
         }
 
-        if (!empty($vPhone) && $commissionAmount > 0) {
+        if (!empty($vPhone) && $totalDeductionAmount > 0) {
             $balBefore = 0.00;
             $wQ = $conn->query("SELECT wallet_balance FROM drivers WHERE phone_number = '" . mysqli_real_escape_string($conn, $vPhone) . "' LIMIT 1");
             if ($wQ && $wrow = $wQ->fetch_assoc()) {
                 $balBefore = (float)$wrow['wallet_balance'];
             }
-            $balAfter = $balBefore - $commissionAmount;
+            $balAfter = $balBefore - $totalDeductionAmount;
 
             // Deduct from drivers and vendors
             $safePhone = mysqli_real_escape_string($conn, $vPhone);
-            $conn->query("UPDATE drivers SET wallet_balance = wallet_balance - $commissionAmount WHERE phone_number = '$safePhone'");
+            $conn->query("UPDATE drivers SET wallet_balance = wallet_balance - $totalDeductionAmount WHERE phone_number = '$safePhone'");
             $conn->query("UPDATE vendors SET wallet_balance = wallet_balance - $commissionAmount WHERE phone_number = '$safePhone'");
 
             // Record transaction ledger
