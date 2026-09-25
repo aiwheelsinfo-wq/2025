@@ -114,6 +114,28 @@ if (!function_exists('get_vendor_free_capacity')) {
         // 2. Query active/busy trips currently assigned to this vendor or any of their linked drivers
         $drivers_in_list = "'" . implode("','", $linked_driver_phones) . "'";
         
+        // If driver/vendor currently has a running trip or an accepted trip for TODAY, check current occupancy:
+        $active_now_sql = "SELECT COUNT(DISTINCT id) AS active_now 
+                           FROM bookings 
+                           WHERE (vender_id = '$escaped_phone' OR driver_id IN ($drivers_in_list))
+                             AND (
+                                 booking_status IN ('Started', 'On-Duty', 'Arrived', 'On-Trip', 'In-Transit')
+                                 OR (
+                                     booking_status = 'Accepted' 
+                                     AND date <= '$today' 
+                                     AND (return_date IS NULL OR return_date = '1970-01-01' OR return_date = '0000-00-00' OR return_date >= '$today')
+                                 )
+                             )";
+        $active_now_res = mysqli_query($conn, $active_now_sql);
+        if ($active_now_res) {
+            $an_row = mysqli_fetch_assoc($active_now_res);
+            $active_now = intval($an_row['active_now'] ?? 0);
+            if ($active_now >= $total_drivers && (empty($target_booking_date) || $target_booking_date <= $today)) {
+                // Partner has no free capacity right now — currently on duty with an accepted/active trip today
+                return 0;
+            }
+        }
+        
         if (empty($target_booking_date) || $target_booking_date <= $today) {
             // Checking capacity for TODAY:
             // Driver is busy today only if they are on an active running trip (Started/On-Duty/Arrived/On-Trip),

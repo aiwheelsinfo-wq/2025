@@ -145,7 +145,7 @@ try {
             users AS u ON b.mobile = u.phone_number
         WHERE 
             (b.vender_id = ? OR b.driver_id = ?) 
-            AND (b.booking_status = 'Accepted' OR b.booking_status = 'Started' OR b.booking_status = 'In-Transit')
+            AND (b.booking_status IN ('Accepted', 'Started', 'In-Transit', 'On-Duty', 'Arrived', 'On-Trip'))
         ORDER BY 
             b.date ASC
     ";
@@ -199,6 +199,47 @@ try {
     }
     $stmtAccepted->close();
 
+    // Determine driver / vendor capacity to check if they are currently occupied with an accepted/active trip
+    $total_capacity = 1;
+    $partner_phone = !empty($vendor_phone) ? $vendor_phone : $driver_phone;
+    if (!empty($partner_phone)) {
+        // Count sub-drivers and fleet vehicles if this partner is a vendor
+        $capStmt = $conn->prepare("
+            SELECT GREATEST(
+                1,
+                (SELECT COUNT(DISTINCT dv.driver_id) FROM driver_vendor_join_Table dv WHERE dv.vendor_id = ?),
+                (SELECT COUNT(DISTINCT c.id) FROM cars c WHERE c.owner_id = ? AND (c.status IN ('active', 'Notified') OR c.status = ''))
+            ) AS total_cap
+        ");
+        if ($capStmt) {
+            $capStmt->bind_param("ss", $partner_phone, $partner_phone);
+            $capStmt->execute();
+            $capStmt->bind_result($tCap);
+            if ($capStmt->fetch() && !empty($tCap)) {
+                $total_capacity = max(1, intval($tCap));
+            }
+            $capStmt->close();
+        }
+    }
+
+    // Calculate how many trips are currently active / scheduled for TODAY
+    $today_active_count = 0;
+    foreach ($acceptedBookings as $ab) {
+        $abDate = $ab['date'] ?? '';
+        $abReturn = (!empty($ab['return_date']) && $ab['return_date'] != '1970-01-01' && $ab['return_date'] != '0000-00-00') ? $ab['return_date'] : $abDate;
+        $abStatus = $ab['booking_status'] ?? '';
+        
+        if (in_array($abStatus, ['Started', 'In-Transit', 'On-Duty', 'Arrived', 'On-Trip'])) {
+            $today_active_count++;
+        } elseif ($abStatus === 'Accepted') {
+            if ($abDate <= $currentDate && $abReturn >= $currentDate) {
+                $today_active_count++;
+            }
+        }
+    }
+
+    $is_driver_occupied_today = ($today_active_count >= $total_capacity);
+
     // Fetch Local Duty global settings for dynamic commission and wallet balance threshold
     $ldCommission = 10.00;
     $ldActive = false;
@@ -213,7 +254,11 @@ try {
     }
 
     // ===================== Fetch Pending Bookings =====================
-    $sqlPending = "
+    $bookings = [];
+
+    // If driver is currently occupied with a running/accepted trip for TODAY, do not show today's marketplace list to prevent double-booking
+    if (!$is_driver_occupied_today) {
+        $sqlPending = "
         SELECT 
             b.id, 
             b.car_type, 
@@ -525,6 +570,24 @@ try {
             }
         }
 
+        // Filter out pending booking if it falls on a date range the driver has already accepted
+        if ($total_capacity <= 1 && !empty($acceptedBookings)) {
+            $has_date_conflict = false;
+            $pDate = $date;
+            $pReturn = (!empty($return_date) && $return_date != '1970-01-01' && $return_date != '0000-00-00') ? $return_date : $pDate;
+            foreach ($acceptedBookings as $ab) {
+                $abDate = $ab['date'] ?? '';
+                $abReturn = (!empty($ab['return_date']) && $ab['return_date'] != '1970-01-01' && $ab['return_date'] != '0000-00-00') ? $ab['return_date'] : $abDate;
+                if ($pDate <= $abReturn && $pReturn >= $abDate) {
+                    $has_date_conflict = true;
+                    break;
+                }
+            }
+            if ($has_date_conflict) {
+                continue; // Skip this booking because driver already has an accepted booking on this date
+            }
+        }
+
         $bookings[] = [
             "booking_id" => $booking_id,
             "car_type" => $car_type,
@@ -558,6 +621,7 @@ try {
         ];
     }
     $stmtPending->close();
+    } // End of if (!$is_driver_occupied)
 
     // ===================== Final Response =====================
     $vPhone = !empty($vendor_phone) ? $vendor_phone : $driver_phone;
@@ -596,6 +660,8 @@ try {
         "is_eligible_for_local_taxi" => ($wallet_balance > $min_wallet_balance),
         "is_eligible_for_local_duty" => ($wallet_balance > $ldMinWallet),
         "is_eligible_for_round_trip" => ($wallet_balance > $rtMinWallet),
+        "is_driver_occupied" => $is_driver_occupied_today,
+        "is_driver_occupied_today" => $is_driver_occupied_today,
         "acceptedBookings" => $acceptedBookings,
         "bookings" => $bookings
     ];
