@@ -61,15 +61,17 @@ try {
 
     $driver_lat = null;
     $driver_lon = null;
+    $driver_city = '';
     if (!empty($driver_phone)) {
-        $drvStmt = $conn->prepare("SELECT latitude, longitude FROM drivers WHERE phone_number = ? LIMIT 1");
+        $drvStmt = $conn->prepare("SELECT latitude, longitude, driver_city FROM drivers WHERE phone_number = ? LIMIT 1");
         if ($drvStmt) {
             $drvStmt->bind_param("s", $driver_phone);
             $drvStmt->execute();
-            $drvStmt->bind_result($dLat, $dLon);
+            $drvStmt->bind_result($dLat, $dLon, $dCity);
             if ($drvStmt->fetch()) {
                 $driver_lat = !empty($dLat) ? floatval($dLat) : null;
                 $driver_lon = !empty($dLon) ? floatval($dLon) : null;
+                $driver_city = trim($dCity ?? '');
             }
             $drvStmt->close();
         }
@@ -276,6 +278,7 @@ try {
     );
 
     $bookings = [];
+    $geocode_cache = [];
     $googleMapsApiKey = 'AIzaSyC41U3p08LqY8G15ruxDCEfTvBLkG_OrsM';
     
     if (!function_exists('getDistance')) {
@@ -470,30 +473,47 @@ try {
             $radius_km = 5;
         }
 
-        // Apply distance filter if driver location is available (for today's immediate rides only; advance rides visible to all)
-        if ($date == $currentDate && $driver_lat !== null && $driver_lon !== null && $driver_lat != 0 && $driver_lon != 0) {
-            // Geocode the booking's pickup address
+        // Apply distance radius filter for BOTH Today and Advance bookings when driver GPS or city is available
+        $has_driver_gps = ($driver_lat !== null && $driver_lon !== null && $driver_lat != 0.0 && $driver_lon != 0.0);
+        if ($has_driver_gps) {
+            // Geocode the booking's pickup address (cached in memory to avoid duplicate API calls)
             $pickup_lat = null;
             $pickup_lng = null;
-            $geocodeUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=" . urlencode($from_address) . "&key=$googleMapsApiKey";
-            try {
-                $geoResponse = @file_get_contents($geocodeUrl);
-                if ($geoResponse) {
-                    $geoData = json_decode($geoResponse, true);
-                    if ($geoData['status'] === 'OK') {
-                        $pickup_lat = $geoData['results'][0]['geometry']['location']['lat'];
-                        $pickup_lng = $geoData['results'][0]['geometry']['location']['lng'];
+            if (isset($geocode_cache[$from_address])) {
+                $pickup_lat = $geocode_cache[$from_address]['lat'];
+                $pickup_lng = $geocode_cache[$from_address]['lng'];
+            } else {
+                $geocodeUrl = "https://maps.googleapis.com/maps/api/geocode/json?address=" . urlencode($from_address) . "&key=$googleMapsApiKey";
+                try {
+                    $geoResponse = @file_get_contents($geocodeUrl);
+                    if ($geoResponse) {
+                        $geoData = json_decode($geoResponse, true);
+                        if ($geoData['status'] === 'OK') {
+                            $pickup_lat = $geoData['results'][0]['geometry']['location']['lat'];
+                            $pickup_lng = $geoData['results'][0]['geometry']['location']['lng'];
+                            $geocode_cache[$from_address] = ['lat' => $pickup_lat, 'lng' => $pickup_lng];
+                        }
                     }
+                } catch (Throwable $e) {
+                    error_log("Geocoding failed in getBookings: " . $e->getMessage());
                 }
-            } catch (Throwable $e) {
-                error_log("Geocoding failed in getBookings: " . $e->getMessage());
             }
 
             if ($pickup_lat !== null && $pickup_lng !== null) {
                 $dist = getDistance($pickup_lat, $pickup_lng, $driver_lat, $driver_lon);
                 if ($dist > $radius_km) {
-                    continue; // Skip this booking because it's outside the driver's radius
+                    continue; // Skip this booking because it's outside the driver's allowable radius
                 }
+            } elseif (!empty($driver_city)) {
+                // If geocoding failed, fallback to verifying driver's city in pickup address
+                if (stripos($from_address, $driver_city) === false) {
+                    continue; // Cannot verify driver is in the pickup zone
+                }
+            }
+        } elseif (!empty($driver_city)) {
+            // Driver GPS is not recorded; verify driver's registered city is mentioned in pickup address
+            if (stripos($from_address, $driver_city) === false) {
+                continue; // Cannot verify driver is in the pickup zone
             }
         }
 
