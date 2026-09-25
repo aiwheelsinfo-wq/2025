@@ -71,6 +71,32 @@ $response = array();
 
  
 $trip_type = $_POST['trip_type'] ?? '';
+
+// Check if service is currently enabled in trip_service_status
+$serviceKeyMap = [
+    'local-taxi' => 'local_taxi',
+    'local taxi' => 'local_taxi',
+    'local-duty' => 'local_duty',
+    'local duty' => 'local_duty',
+    'hourly rental' => 'local_duty',
+    'one-way' => 'one_way',
+    'one way' => 'one_way',
+    'round-trip' => 'round_trip',
+    'round trip' => 'round_trip'
+];
+$checkKey = $serviceKeyMap[strtolower(trim($trip_type))] ?? null;
+if (!empty($checkKey)) {
+    $svcCheck = $conn->query("SELECT is_enabled, coming_soon_title, coming_soon_message FROM trip_service_status WHERE service_key = '$checkKey' LIMIT 1");
+    if ($svcCheck && $svcRow = $svcCheck->fetch_assoc()) {
+        if (intval($svcRow['is_enabled']) === 0) {
+            echo json_encode([
+                "status" => false,
+                "message" => !empty($svcRow['coming_soon_message']) ? $svcRow['coming_soon_message'] : "This service is currently unavailable. Coming soon!"
+            ]);
+            exit;
+        }
+    }
+}
 $car_type = $_POST['car_type'] ?? '';
 $from_address = $_POST['from_address'] ?? '';
 $to_address = $_POST['to_address'] ?? '';
