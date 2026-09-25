@@ -73,6 +73,31 @@ try {
             }
             $drvStmt->close();
         }
+
+        // Fetch driver's direct registered vehicle type and any fleet cars (for vendors or linked drivers)
+        $driver_vehicle_str = '';
+        $vTypeStmt = $conn->prepare("
+            SELECT d.vehicle_type,
+                   (
+                       SELECT GROUP_CONCAT(DISTINCT c.vehicle_type SEPARATOR ',')
+                       FROM cars c
+                       LEFT JOIN driver_vendor_join_Table dv ON dv.vendor_id = c.owner_id
+                       WHERE (c.owner_id = d.phone_number OR dv.driver_id = d.phone_number)
+                         AND (c.status IN ('active', 'Notified') OR c.status = '')
+                   ) AS fleet_cars
+            FROM drivers d
+            WHERE d.phone_number = ?
+            LIMIT 1
+        ");
+        if ($vTypeStmt) {
+            $vTypeStmt->bind_param("s", $driver_phone);
+            $vTypeStmt->execute();
+            $vTypeStmt->bind_result($dVType, $fCars);
+            if ($vTypeStmt->fetch()) {
+                $driver_vehicle_str = trim(($dVType ?? '') . ',' . ($fCars ?? ''), ',');
+            }
+            $vTypeStmt->close();
+        }
     }
 
     // ===================== Fetch Accepted Bookings =====================
@@ -266,6 +291,161 @@ try {
         }
     }
 
+    if (!function_exists('is_driver_vehicle_match')) {
+        /**
+         * Checks if a driver's vehicle(s) match the requested booking car_type.
+         * Handles category variations, sub-models, and multiple fleet vehicles.
+         */
+        function is_driver_vehicle_match($booking_car_type, $driver_vehicle_str) {
+            if (empty($booking_car_type)) {
+                return true;
+            }
+            $booking_type = strtolower(trim((string)$booking_car_type));
+            if ($booking_type === 'all' || $booking_type === 'any' || $booking_type === '') {
+                return true;
+            }
+
+            $driver_str = strtolower(trim((string)$driver_vehicle_str));
+            if (empty($driver_str)) {
+                return false;
+            }
+
+            $wants_sedan = (
+                stripos($booking_type, 'sedan') !== false ||
+                stripos($booking_type, 'sadan') !== false ||
+                stripos($booking_type, 'sadden') !== false ||
+                stripos($booking_type, 'dzire') !== false ||
+                stripos($booking_type, 'aura') !== false ||
+                stripos($booking_type, 'etios') !== false ||
+                stripos($booking_type, 'amaze') !== false
+            );
+
+            $wants_hatchback = (
+                stripos($booking_type, 'hatch') !== false ||
+                stripos($booking_type, 'hack') !== false ||
+                stripos($booking_type, 'hash') !== false ||
+                stripos($booking_type, 'wagon') !== false ||
+                stripos($booking_type, 'celerio') !== false ||
+                stripos($booking_type, 'tiago') !== false ||
+                stripos($booking_type, 'i10') !== false
+            );
+
+            $wants_ertiga = (
+                stripos($booking_type, 'ertiga') !== false ||
+                stripos($booking_type, 'ertigl') !== false ||
+                stripos($booking_type, 'romiyon') !== false ||
+                stripos($booking_type, 'rumion') !== false
+            );
+
+            $wants_crysta_innova = (
+                stripos($booking_type, 'crysta') !== false ||
+                stripos($booking_type, 'innova') !== false
+            );
+
+            $wants_suv = (
+                stripos($booking_type, 'suv') !== false ||
+                stripos($booking_type, 'auv') !== false ||
+                stripos($booking_type, 'xuv') !== false ||
+                stripos($booking_type, 'mpv') !== false ||
+                $wants_ertiga ||
+                $wants_crysta_innova
+            );
+
+            $wants_tempo = (
+                stripos($booking_type, 'tempo') !== false ||
+                stripos($booking_type, 'traveller') !== false ||
+                stripos($booking_type, 'urabainia') !== false
+            );
+
+            $entries = preg_split('/[,\|\n\/]+/', $driver_str);
+
+            foreach ($entries as $entry) {
+                $e = trim(strtolower($entry));
+                if (empty($e)) continue;
+
+                $is_sedan = (
+                    stripos($e, 'sedan') !== false ||
+                    stripos($e, 'sadan') !== false ||
+                    stripos($e, 'sadden') !== false ||
+                    stripos($e, 'seden') !== false ||
+                    stripos($e, 'sedaan') !== false ||
+                    stripos($e, 'sudan') !== false ||
+                    stripos($e, 'dzire') !== false ||
+                    stripos($e, 'dizayr') !== false ||
+                    stripos($e, 'aura') !== false ||
+                    stripos($e, 'etios') !== false ||
+                    stripos($e, 'amaze') !== false ||
+                    stripos($e, 'bmw') !== false
+                );
+
+                $is_hatchback = (
+                    stripos($e, 'hatch') !== false ||
+                    stripos($e, 'hack back') !== false ||
+                    stripos($e, 'hashback') !== false ||
+                    stripos($e, 'wagon') !== false ||
+                    stripos($e, 'celerio') !== false ||
+                    stripos($e, 'tiago') !== false ||
+                    stripos($e, 'i10') !== false ||
+                    stripos($e, 'alto') !== false ||
+                    stripos($e, 'kwid') !== false ||
+                    (stripos($e, 'swift') !== false && stripos($e, 'dzire') === false && stripos($e, 'dizayr') === false)
+                );
+
+                $is_ertiga = (
+                    stripos($e, 'ertiga') !== false ||
+                    stripos($e, 'ertigl') !== false ||
+                    stripos($e, 'romiyon') !== false ||
+                    stripos($e, 'rumion') !== false
+                );
+
+                $is_crysta_innova = (
+                    stripos($e, 'crysta') !== false ||
+                    stripos($e, 'innova') !== false
+                );
+
+                $is_suv = (
+                    stripos($e, 'suv') !== false ||
+                    stripos($e, 'auv') !== false ||
+                    stripos($e, 'xuv') !== false ||
+                    stripos($e, 'mpv') !== false ||
+                    stripos($e, 'carens') !== false ||
+                    stripos($e, '7 seater') !== false ||
+                    stripos($e, 'scorpio') !== false ||
+                    stripos($e, 'bolero') !== false ||
+                    stripos($e, 'safari') !== false ||
+                    stripos($e, 'harrier') !== false ||
+                    stripos($e, 'marazzo') !== false ||
+                    $is_ertiga ||
+                    $is_crysta_innova
+                );
+
+                $is_tempo = (
+                    stripos($e, 'tempo') !== false ||
+                    stripos($e, 'traveller') !== false ||
+                    stripos($e, 'urabainia') !== false ||
+                    $e === '14'
+                );
+
+                if ($wants_sedan && $is_sedan) return true;
+                if ($wants_hatchback && $is_hatchback) return true;
+                if ($wants_crysta_innova) {
+                    if ($is_crysta_innova || ($is_suv && stripos($e, 'premium') !== false)) return true;
+                } elseif ($wants_ertiga) {
+                    if ($is_ertiga || $is_suv) return true;
+                } elseif ($wants_suv && $is_suv) {
+                    return true;
+                }
+                if ($wants_tempo && $is_tempo) return true;
+
+                if ($e === $booking_type || (strlen($e) > 3 && stripos($booking_type, $e) !== false) || (strlen($booking_type) > 3 && stripos($e, $booking_type) !== false)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+
     while ($stmtPending->fetch()) {
         // Dynamically compute vendor_amount for Local-Duty based on live admin commission on baseAmount (excluding 5% GST)
         if (stripos($trip_type, 'duty') !== false && $ldActive) {
@@ -314,6 +494,14 @@ try {
                 if ($dist > $radius_km) {
                     continue; // Skip this booking because it's outside the driver's radius
                 }
+            }
+        }
+
+        // Filter by Vehicle Category: If booking specifies car_type (e.g. Sedan, Hatchback, SUV, Ertiga, Crysta),
+        // only show this trip if the requesting driver possesses a matching vehicle.
+        if (!empty($car_type) && !empty($driver_vehicle_str)) {
+            if (!is_driver_vehicle_match($car_type, $driver_vehicle_str)) {
+                continue; // Skip trip not matching driver's vehicle type
             }
         }
 
@@ -381,6 +569,7 @@ try {
     $response = [
         "success" => true,
         "wallet_balance" => $wallet_balance,
+        "driver_vehicle_type" => $driver_vehicle_str,
         "min_wallet_balance" => $min_wallet_balance,
         "min_wallet_balance_local_duty" => $ldMinWallet,
         "min_wallet_balance_round_trip" => $rtMinWallet,
