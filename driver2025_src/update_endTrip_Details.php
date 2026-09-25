@@ -452,15 +452,15 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Round-
             // Deduct from drivers and vendors
             $safePhone = mysqli_real_escape_string($conn, $vPhone);
             $conn->query("UPDATE drivers SET wallet_balance = wallet_balance - $totalDeductionAmount WHERE phone_number = '$safePhone'");
-            $conn->query("UPDATE vendors SET wallet_balance = wallet_balance - $commissionAmount WHERE phone_number = '$safePhone'");
+            $conn->query("UPDATE vendors SET wallet_balance = wallet_balance - $totalDeductionAmount WHERE phone_number = '$safePhone'");
 
             // Record transaction ledger
-            $desc = "Commission (" . number_format($companySharePercent, 1) . "%) for Local Taxi Trip #" . $booking_id;
+            $desc = "Platform Commission (" . number_format($companySharePercent, 1) . "%: ₹" . number_format($commissionAmount, 0) . ") + 5% GST (₹" . number_format($gstAmount, 0) . ") for Local Taxi Trip #" . $booking_id;
             $tType = 'trip_commission_deduct';
             $logStmt = $conn->prepare("INSERT INTO vendor_wallet_transactions (vendor_phone, booking_id, transaction_type, amount, balance_before, balance_after, description) VALUES (?, ?, ?, ?, ?, ?, ?)");
             if ($logStmt) {
                 $bIdInt = (int)$booking_id;
-                $logStmt->bind_param("sisddds", $vPhone, $bIdInt, $tType, $commissionAmount, $balBefore, $balAfter, $desc);
+                $logStmt->bind_param("sisddds", $vPhone, $bIdInt, $tType, $totalDeductionAmount, $balBefore, $balAfter, $desc);
                 $logStmt->execute();
                 $logStmt->close();
             }
