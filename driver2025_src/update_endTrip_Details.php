@@ -8,6 +8,40 @@ date_default_timezone_set('Asia/Kolkata');
 $current_date = date('Y-m-d');
 $current_time = date('H:i:s');
 
+/**
+ * UltraMsg WhatsApp Notification Helper
+ */
+if (!function_exists('sendUltraMsgWhatsApp')) {
+    function sendUltraMsgWhatsApp($phone, $message) {
+        $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+        if (strlen($cleanPhone) === 10) {
+            $cleanPhone = '91' . $cleanPhone;
+        }
+        if (strlen($cleanPhone) < 10) {
+            return false;
+        }
+
+        $url = "https://api.ultramsg.com/instance182608/messages/chat";
+        $payload = [
+            'token' => 'h4ltyv2brjcj63jz',
+            'to' => $cleanPhone,
+            'body' => $message,
+            'priority' => 10
+        ];
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($payload));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        $res = curl_exec($ch);
+        curl_close($ch);
+        return $res;
+    }
+}
+
 // Read POST data
 $booking_id   = $_POST['booking_id'] ?? null;
 $status       = $_POST['status'] ?? null;
@@ -538,38 +572,4 @@ if (isset($stmt) && $stmt) {
     $stmt->close();
 }
 $conn->close();
-
-/**
- * UltraMsg WhatsApp Notification Helper
- */
-if (!function_exists('sendUltraMsgWhatsApp')) {
-    function sendUltraMsgWhatsApp($phone, $message) {
-        $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
-        if (strlen($cleanPhone) === 10) {
-            $cleanPhone = '91' . $cleanPhone;
-        }
-        if (strlen($cleanPhone) < 10) {
-            return false;
-        }
-
-        $url = "https://api.ultramsg.com/instance182608/messages/chat";
-        $payload = [
-            'token' => 'h4ltyv2brjcj63jz',
-            'to' => $cleanPhone,
-            'body' => $message,
-            'priority' => 10
-        ];
-
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($payload));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 3);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        $res = curl_exec($ch);
-        curl_close($ch);
-        return $res;
-    }
-}
 ?>
