@@ -36,14 +36,16 @@ if ($trip_id <= 0) {
 }
 
 // Check existing booking to get or generate end_otp and keep start otp intact
-$existingQ = $conn->query("SELECT otp, end_otp, trip_type FROM bookings WHERE id = '$trip_id' LIMIT 1");
+$existingQ = $conn->query("SELECT id, otp, end_otp, trip_type, mobile, customer_number, car_type, vehicle_id, driver_id, from_address, to_address FROM bookings WHERE id = '$trip_id' LIMIT 1");
 $existingEndOtp = '';
 $startOtp = '';
 $tripType = '';
+$existingBookingRow = null;
 if ($existingQ && $exRow = $existingQ->fetch_assoc()) {
     $existingEndOtp = trim($exRow['end_otp'] ?? '');
     $startOtp = trim($exRow['otp'] ?? '');
     $tripType = trim($exRow['trip_type'] ?? '');
+    $existingBookingRow = $exRow;
 }
 
 // Generate secure 4-digit End OTP for drop-off completion if not already present
@@ -85,6 +87,59 @@ if ($stmt) {
     $stmt->close();
 
     if ($result) {
+        // Send WhatsApp notification for Round-Trip starting KM to customer
+        try {
+            $isRoundTrip = (strcasecmp($tripType, 'Round-Trip') === 0 || strcasecmp($tripType, 'Round trip') === 0 || strcasecmp($tripType, 'Round-trip') === 0);
+            if ($isRoundTrip && !empty($existingBookingRow)) {
+                $custPhone = !empty($existingBookingRow['mobile']) ? trim($existingBookingRow['mobile']) : trim($existingBookingRow['customer_number'] ?? '');
+                if (!empty($custPhone)) {
+                    // Get customer name if available
+                    $custName = 'Customer';
+                    $cleanCustPhone = mysqli_real_escape_string($conn, $custPhone);
+                    $cQ = $conn->query("SELECT name FROM customers WHERE mobile = '$cleanCustPhone' LIMIT 1");
+                    if ($cQ && $cRow = $cQ->fetch_assoc()) {
+                        if (!empty($cRow['name'])) $custName = trim($cRow['name']);
+                    }
+
+                    // Get driver name if available
+                    $driverName = 'Assigned Driver';
+                    $driverId = trim($existingBookingRow['driver_id'] ?? '');
+                    if (!empty($driverId)) {
+                        $cleanDId = mysqli_real_escape_string($conn, $driverId);
+                        $dQ = $conn->query("SELECT full_name FROM drivers WHERE phone_number = '$cleanDId' LIMIT 1");
+                        if ($dQ && $dRow = $dQ->fetch_assoc()) {
+                            if (!empty($dRow['full_name'])) $driverName = trim($dRow['full_name']);
+                        }
+                    }
+
+                    $carType = !empty($existingBookingRow['car_type']) ? trim($existingBookingRow['car_type']) : 'Cab';
+                    $vehId = !empty($existingBookingRow['vehicle_id']) ? " (" . trim($existingBookingRow['vehicle_id']) . ")" : '';
+                    $kmFormatted = ($starting_km !== null) ? number_format($starting_km) . " KM" : "Recorded";
+                    $fromParts = !empty($existingBookingRow['from_address']) ? explode(',', $existingBookingRow['from_address']) : ['Pickup'];
+                    $fromLoc = trim($fromParts[0]);
+                    $toParts = !empty($existingBookingRow['to_address']) ? explode(',', $existingBookingRow['to_address']) : ['Destination'];
+                    $toLoc = trim($toParts[0]);
+
+                    $msg = "🚗 *Trip Started - Agni Car Rental*\n\n"
+                         . "Hello *" . $custName . "*,\n"
+                         . "Your Round-Trip booking (*#" . $trip_id . "*) has officially started.\n\n"
+                         . "📍 *Starting Odometer:* *" . $kmFormatted . "*\n"
+                         . "⏰ *Start Time:* " . date("h:i A", strtotime($starting_time)) . "\n"
+                         . "🚘 *Vehicle:* " . $carType . $vehId . "\n"
+                         . "👨‍✈️ *Driver:* " . $driverName . "\n"
+                         . "🛣️ *Route:* " . $fromLoc . " ➔ " . $toLoc . "\n\n"
+                         . "🔐 *End OTP for Drop-Off:* *" . $end_otp . "*\n"
+                         . "_(Please share this OTP with driver only when your trip is completed)_\n\n"
+                         . "Have a safe and pleasant journey with Agni Car Rental!";
+
+                    sendUltraMsgWhatsApp($custPhone, $msg);
+                }
+            }
+        } catch (Throwable $notifErr) {
+            // Fail-safe: Notification issue must NEVER break trip start response
+            @file_put_contents("whatsapp_log.txt", "Start Trip Err: " . $notifErr->getMessage() . PHP_EOL, FILE_APPEND);
+        }
+
         echo json_encode([
             "success" => true,
             "message" => "Trip started successfully.",
@@ -107,4 +162,38 @@ if ($stmt) {
 }
 
 $conn->close();
+
+/**
+ * UltraMsg WhatsApp Notification Helper
+ */
+if (!function_exists('sendUltraMsgWhatsApp')) {
+    function sendUltraMsgWhatsApp($phone, $message) {
+        $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+        if (strlen($cleanPhone) === 10) {
+            $cleanPhone = '91' . $cleanPhone;
+        }
+        if (strlen($cleanPhone) < 10) {
+            return false;
+        }
+
+        $url = "https://api.ultramsg.com/instance182608/messages/chat";
+        $payload = [
+            'token' => 'h4ltyv2brjcj63jz',
+            'to' => $cleanPhone,
+            'body' => $message,
+            'priority' => 10
+        ];
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($payload));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        $res = curl_exec($ch);
+        curl_close($ch);
+        return $res;
+    }
+}
 ?>

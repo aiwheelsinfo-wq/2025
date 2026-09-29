@@ -145,6 +145,43 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Round-
         $update_stmt->execute();
         $update_stmt->close();
 
+        // Send WhatsApp notification for Round-Trip ending KM to customer
+        try {
+            $bDetQ = $conn->query("SELECT mobile, customer_number, starting_km, closing_km, running_km, car_type, vehicle_id FROM bookings WHERE id = '" . mysqli_real_escape_string($conn, $booking_id) . "' LIMIT 1");
+            if ($bDetQ && $bDet = $bDetQ->fetch_assoc()) {
+                $custPhone = !empty($bDet['mobile']) ? trim($bDet['mobile']) : trim($bDet['customer_number'] ?? '');
+                if (!empty($custPhone)) {
+                    $custName = 'Customer';
+                    $cleanCustPhone = mysqli_real_escape_string($conn, $custPhone);
+                    $cQ = $conn->query("SELECT name FROM customers WHERE mobile = '$cleanCustPhone' LIMIT 1");
+                    if ($cQ && $cRow = $cQ->fetch_assoc()) {
+                        if (!empty($cRow['name'])) $custName = trim($cRow['name']);
+                    }
+
+                    $sKmVal = intval($bDet['starting_km'] ?? 0);
+                    $eKmVal = ($closing_km !== null) ? intval($closing_km) : intval($bDet['closing_km'] ?? 0);
+                    $totalDist = ($eKmVal > $sKmVal) ? ($eKmVal - $sKmVal) : intval($bDet['running_km'] ?? 0);
+                    $carType = !empty($bDet['car_type']) ? trim($bDet['car_type']) : 'Cab';
+                    $vehId = !empty($bDet['vehicle_id']) ? " (" . trim($bDet['vehicle_id']) . ")" : '';
+
+                    $endMsg = "🏁 *Trip Completed - Agni Car Rental*\n\n"
+                            . "Hello *" . $custName . "*,\n"
+                            . "Your Round-Trip booking (*#" . $booking_id . "*) has been successfully completed.\n\n"
+                            . "📊 *Odometer & Distance Summary:*\n"
+                            . "📍 *Starting KM:* " . number_format($sKmVal) . " KM\n"
+                            . "📍 *Ending KM:* " . number_format($eKmVal) . " KM\n"
+                            . "🛣️ *Total Distance:* *" . number_format($totalDist) . " KM*\n\n"
+                            . "💰 *Total Fare:* *₹" . number_format($total_amount, 2) . "*\n"
+                            . (!empty($next_invoice_no) ? "🧾 *Invoice No:* " . $next_invoice_no . "\n\n" : "\n")
+                            . "Thank you for riding with Agni Car Rental. We look forward to serving you again!";
+
+                    sendUltraMsgWhatsApp($custPhone, $endMsg);
+                }
+            }
+        } catch (Throwable $endNotifErr) {
+            @file_put_contents("whatsapp_log.txt", "End Trip Err: " . $endNotifErr->getMessage() . PHP_EOL, FILE_APPEND);
+        }
+
         echo json_encode([
             'success' => true,
             'message' => 'Booking updated successfully',
@@ -501,4 +538,38 @@ if (isset($stmt) && $stmt) {
     $stmt->close();
 }
 $conn->close();
+
+/**
+ * UltraMsg WhatsApp Notification Helper
+ */
+if (!function_exists('sendUltraMsgWhatsApp')) {
+    function sendUltraMsgWhatsApp($phone, $message) {
+        $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
+        if (strlen($cleanPhone) === 10) {
+            $cleanPhone = '91' . $cleanPhone;
+        }
+        if (strlen($cleanPhone) < 10) {
+            return false;
+        }
+
+        $url = "https://api.ultramsg.com/instance182608/messages/chat";
+        $payload = [
+            'token' => 'h4ltyv2brjcj63jz',
+            'to' => $cleanPhone,
+            'body' => $message,
+            'priority' => 10
+        ];
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($payload));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        $res = curl_exec($ch);
+        curl_close($ch);
+        return $res;
+    }
+}
 ?>
