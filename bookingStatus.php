@@ -127,6 +127,27 @@ while ($row = $result->fetch_assoc()) {
         $row['return_time'] = date('h:i A', strtotime($row['return_time']));
     }
 
+    // Check if trip review exists for this booking
+    $b_id_str = strval($row['id']);
+    $b_custom_id = !empty($row['booking_id']) ? strval($row['booking_id']) : $b_id_str;
+    $revStmt = $conn->prepare("SELECT id, rating FROM trip_reviews WHERE booking_id = ? OR booking_id = ? LIMIT 1");
+    if ($revStmt) {
+        $revStmt->bind_param("ss", $b_custom_id, $b_id_str);
+        $revStmt->execute();
+        $revRes = $revStmt->get_result();
+        if ($revRow = $revRes->fetch_assoc()) {
+            $row['has_reviewed'] = true;
+            $row['review_rating'] = intval($revRow['rating']);
+        } else {
+            $row['has_reviewed'] = false;
+            $row['review_rating'] = null;
+        }
+        $revStmt->close();
+    } else {
+        $row['has_reviewed'] = false;
+        $row['review_rating'] = null;
+    }
+
     $bookings[] = $row;
 }
 
