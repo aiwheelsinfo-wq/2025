@@ -252,10 +252,41 @@ if ($trip_type == 'One-way' && !empty($bookingId)) {
     }
 }
 
-$isOneWayDirect = (strcasecmp($trip_type, 'One-way') === 0 || $payment_type === 'Pay to Driver' || $payment_type === 'Cash');
-$booking_status_val = $isOneWayDirect ? 'Pending' : 'temp';
-if ($isOneWayDirect && (empty($payment_type) || $payment_type === 'Advance')) {
-    $payment_type = 'Pay to Driver';
+$paid_amount = isset($_POST['paid_amount']) ? floatval($_POST['paid_amount']) : (isset($_POST['advance_amount']) ? floatval($_POST['advance_amount']) : 0.00);
+$remaining_balance = isset($_POST['remaining_balance']) ? floatval($_POST['remaining_balance']) : max(0.00, floatval($total_amount) - $paid_amount);
+$payment_id = !empty($_POST['payment_id']) ? mysqli_real_escape_string($conn, $_POST['payment_id']) : '';
+
+// Check whether online payment is required before confirming the booking:
+// Online payment is required if:
+// 1) $payment_type is 'Advance' or 'Online'
+// 2) OR advance/paid amount is specified > 0
+// AND $payment_id is EMPTY (meaning the user has NOT completed payment through the gateway yet).
+$requiresOnlinePayment = (
+    ($payment_type === 'Advance' || $payment_type === 'Online' || $paid_amount > 0) &&
+    empty($payment_id)
+);
+
+if ($requiresOnlinePayment) {
+    // 🟡 Booking requires upfront online payment via Razorpay.
+    // Kept as 'temp' / 'pending_payment' until Razorpay callback succeeds via updatePayment.php.
+    // Drivers must NOT be alerted and customer must NOT receive confirmation message yet.
+    $booking_status_val = 'temp';
+    $payment_status = 'pending_payment';
+    $payment_type = 'Advance';
+    $isDirectConfirmed = false;
+} else {
+    // 🟢 Direct Cash / Pay to Driver (e.g. Mode 1 with 0% advance) OR payment was already completed.
+    $booking_status_val = 'Pending';
+    if (!empty($payment_id)) {
+        $payment_status = !empty($_POST['payment_status']) ? mysqli_real_escape_string($conn, $_POST['payment_status']) : 'Advance Paid';
+        $payment_type = 'Advance';
+    } else {
+        $payment_status = 'pending';
+        $payment_type = ($payment_type === 'Advance') ? 'Pay to Driver' : ($payment_type ?: 'Pay to Driver');
+        $paid_amount = 0.00;
+        $remaining_balance = floatval($total_amount);
+    }
+    $isDirectConfirmed = true;
 }
 
 if ($existingBookingFound) {
@@ -275,6 +306,10 @@ if ($existingBookingFound) {
         toll_charge = '$toll_charge',
         total_amount = '$total_amount',
         payment_type = '$payment_type',
+        paid_amount = '$paid_amount',
+        remaining_balance = '$remaining_balance',
+        payment_status = '$payment_status',
+        payment_id = '$payment_id',
         return_date = '$return_date',
         return_time = '$return_time',
         otp = '$otp',
@@ -295,7 +330,7 @@ if ($existingBookingFound) {
         $response["booking_id"] = $bookingId;
         $final_booking_id = $bookingId;
 
-        if ($isOneWayDirect && !empty($final_booking_id)) {
+        if ($isDirectConfirmed && !empty($final_booking_id)) {
             try {
                 require_once __DIR__ . '/send_new_booking_notification.php';
                 $notifLat = !empty($ref_lat) ? $ref_lat : null;
@@ -319,8 +354,8 @@ if ($existingBookingFound) {
     echo json_encode($response);
 } else {
     // 🔽 Now insert booking info into `bookings` table (only relevant fields)
-    $insertBookingSql = "INSERT INTO bookings (trip_type, car_type, from_address, to_address, distance, date, time, booked_at, mobile, agent_commission, base_charge, driver_ta, toll_charge, total_amount, payment_type, return_date, return_time, otp, agni_amount, vendor_amount, booker_id, gst, gst_number, business_name, business_address, business_pincode, booking_status)
-    VALUES ('$trip_type', '$car_type', '$from_address', '$to_address', '$distance', '$date', '$tripTime', '$booked_at', '$contact_number', '$agent_commission', '$base_charge', '$driver_ta', '$toll_charge', '$total_amount', '$payment_type', '$return_date', '$return_time', '$otp', '$agni_amount', '$vendor_amount', '$userNumber', '$gst', '$gst_number', '$business_name', '$business_address', '$business_pincode', '$booking_status_val')";
+    $insertBookingSql = "INSERT INTO bookings (trip_type, car_type, from_address, to_address, distance, date, time, booked_at, mobile, agent_commission, base_charge, driver_ta, toll_charge, total_amount, payment_type, paid_amount, remaining_balance, payment_status, payment_id, return_date, return_time, otp, agni_amount, vendor_amount, booker_id, gst, gst_number, business_name, business_address, business_pincode, booking_status)
+    VALUES ('$trip_type', '$car_type', '$from_address', '$to_address', '$distance', '$date', '$tripTime', '$booked_at', '$contact_number', '$agent_commission', '$base_charge', '$driver_ta', '$toll_charge', '$total_amount', '$payment_type', '$paid_amount', '$remaining_balance', '$payment_status', '$payment_id', '$return_date', '$return_time', '$otp', '$agni_amount', '$vendor_amount', '$userNumber', '$gst', '$gst_number', '$business_name', '$business_address', '$business_pincode', '$booking_status_val')";
 
     if (mysqli_query($conn, $insertBookingSql)) {
         $booking_id = mysqli_insert_id($conn); // get the auto-increment ID
@@ -329,7 +364,7 @@ if ($existingBookingFound) {
         $response["booking_id"] = $booking_id;
         $final_booking_id = $booking_id;
 
-        if ($isOneWayDirect && !empty($final_booking_id)) {
+        if ($isDirectConfirmed && !empty($final_booking_id)) {
             try {
                 require_once __DIR__ . '/send_new_booking_notification.php';
                 $notifLat = !empty($ref_lat) ? $ref_lat : null;

@@ -53,7 +53,7 @@ if (!function_exists('sendEmailAlert')) {
         ];
 
         $api_key = '';
-        $sender_name = 'Agni Car Rental';
+        $sender_name = 'Rentox Car Rental';
         $sender_email = 'ai.wheels.info@gmail.com';
 
         foreach ($config_paths as $config_path) {
@@ -166,7 +166,7 @@ if (!function_exists('sendSMSAlert')) {
  */
 if (!function_exists('sendBookingWhatsAppNotification')) {
     function sendBookingWhatsAppNotification($booking_id, $conn) {
-        $stmt = $conn->prepare("SELECT trip_type, from_address, to_address, date, time, mobile, total_amount FROM bookings WHERE id = ?");
+        $stmt = $conn->prepare("SELECT trip_type, from_address, to_address, date, time, mobile, total_amount, paid_amount, remaining_balance, payment_type FROM bookings WHERE id = ?");
         if (!$stmt) return false;
         $stmt->bind_param("i", $booking_id);
         $stmt->execute();
@@ -185,6 +185,9 @@ if (!function_exists('sendBookingWhatsAppNotification')) {
         $date = date('d-m-Y', strtotime($booking['date']));
         $time = date('h:i A', strtotime($booking['time']));
         $amount = $booking['total_amount'];
+        $paid_amount = floatval($booking['paid_amount'] ?? 0);
+        $tracking_token = substr(hash('sha256', $booking_id . $mobile . 'rentox_salt_2026'), 0, 16);
+        $tracking_link = "https://www.rentox.co.in/status/" . $booking_id . "?token=" . $tracking_token;
 
         // Fetch user name and email
         $name = "Customer";
@@ -207,7 +210,7 @@ if (!function_exists('sendBookingWhatsAppNotification')) {
         }
 
         // WhatsApp message
-        $wa_message = "*Booking Received!* 🚗\n\n" .
+        $wa_message = "*Booking Confirmed!* 🚗\n\n" .
                       "Dear *{$name}*,\n" .
                       "Thank you for booking with *Rentox Car Rental*! We have received your trip request.\n\n" .
                       "📍 *Booking Details:*\n" .
@@ -218,8 +221,16 @@ if (!function_exists('sendBookingWhatsAppNotification')) {
             $wa_message .= "• *Drop:* {$to}\n";
         }
         $wa_message .= "• *Date & Time:* {$date} at {$time}\n" .
-                       "• *Amount:* ₹{$amount}\n\n" .
-                       "We are currently assigning the nearest professional driver to your ride and will send you confirmation details shortly. Thank you!";
+                       "• *Total Fare:* ₹" . number_format($amount, 2) . "\n";
+        if ($paid_amount > 0) {
+            $wa_message .= "• *Advance Paid Online:* ₹" . number_format($paid_amount, 2) . " ✅\n" .
+                           "• *Balance Cash to Driver:* ₹" . number_format($remaining_balance, 2) . "\n";
+        } else {
+            $wa_message .= "• *Payment Mode:* Cash to Driver (at trip end)\n";
+        }
+        $wa_message .= "\n📲 *View Trip Details & Live Status:*\n" .
+                       "👉 {$tracking_link}\n\n" .
+                       "We are assigning the nearest professional driver to your ride. Click the link above to view your pickup OTP and track your trip. Thank you! 🙏";
 
         // Email body (HTML)
         $email_subject = "Booking Received! - ID #{$booking_id}";
@@ -258,10 +269,28 @@ if (!function_exists('sendBookingWhatsAppNotification')) {
                 <tr>
                     <td style="padding: 8px 0; font-weight: bold; color: #4b5563; border-bottom: 1px solid #f3f4f6;">Total Amount:</td>
                     <td style="padding: 8px 0; font-weight: bold; color: #10b981; border-bottom: 1px solid #f3f4f6;">₹' . number_format($amount, 2) . '</td>
+                </tr>';
+        if ($paid_amount > 0) {
+            $email_body .= '
+                <tr>
+                    <td style="padding: 8px 0; font-weight: bold; color: #4b5563; border-bottom: 1px solid #f3f4f6;">Advance Paid:</td>
+                    <td style="padding: 8px 0; font-weight: bold; color: #0284c7; border-bottom: 1px solid #f3f4f6;">₹' . number_format($paid_amount, 2) . ' (Online)</td>
                 </tr>
+                <tr>
+                    <td style="padding: 8px 0; font-weight: bold; color: #4b5563; border-bottom: 1px solid #f3f4f6;">Cash to Driver:</td>
+                    <td style="padding: 8px 0; font-weight: bold; color: #d97706; border-bottom: 1px solid #f3f4f6;">₹' . number_format($remaining_balance, 2) . '</td>
+                </tr>';
+        }
+        $email_body .= '
             </table>
 
-            <p style="font-size: 15px; line-height: 1.5; margin-top: 25px;">We are currently assigning the nearest professional driver to your ride and will send you confirmation details shortly.</p>
+            <div style="text-align: center; margin: 25px 0;">
+                <a href="' . $tracking_link . '" style="background-color: #FFB300; color: #1f2937; font-weight: bold; text-decoration: none; padding: 12px 26px; border-radius: 8px; display: inline-block; font-size: 14px;">
+                    📲 Track Ride & View Details
+                </a>
+            </div>
+
+            <p style="font-size: 15px; line-height: 1.5; margin-top: 15px;">We are currently assigning the nearest professional driver to your ride and will send you confirmation details shortly.</p>
             <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">
             <p style="font-size: 12px; color: #9ca3af; text-align: center;">&copy; 2026 Rentox Car Rental. All rights reserved.</p>
         </div>
@@ -304,7 +333,7 @@ if (!function_exists('sendBookingWhatsAppNotification')) {
  */
 if (!function_exists('sendAcceptWhatsAppNotification')) {
     function sendAcceptWhatsAppNotification($booking_id, $conn) {
-        $stmt = $conn->prepare("SELECT trip_type, from_address, to_address, date, time, mobile, driver_id, vehicle_id, total_amount FROM bookings WHERE id = ?");
+        $stmt = $conn->prepare("SELECT trip_type, from_address, to_address, date, time, mobile, driver_id, vehicle_id, total_amount, paid_amount, remaining_balance, payment_type FROM bookings WHERE id = ?");
         if (!$stmt) return false;
         $stmt->bind_param("i", $booking_id);
         $stmt->execute();
@@ -325,6 +354,9 @@ if (!function_exists('sendAcceptWhatsAppNotification')) {
         $date = date('d-m-Y', strtotime($booking['date']));
         $time = date('h:i A', strtotime($booking['time']));
         $amount = $booking['total_amount'];
+        $paid_amount = floatval($booking['paid_amount'] ?? 0);
+        $remaining_balance = floatval($booking['remaining_balance'] ?? 0);
+        $payment_type = $booking['payment_type'] ?? '';
 
         // Fetch driver details
         $driver_name = "Assigned Driver";
@@ -362,6 +394,9 @@ if (!function_exists('sendAcceptWhatsAppNotification')) {
             $user_stmt->close();
         }
 
+        $tracking_token = substr(hash('sha256', $booking_id . $mobile . 'rentox_salt_2026'), 0, 16);
+        $tracking_link = "https://www.rentox.co.in/status/" . $booking_id . "?token=" . $tracking_token;
+
         // WhatsApp message
         $wa_message = "*Booking Confirmed!* 🎉\n\n" .
                       "Dear *{$name}*,\n" .
@@ -373,12 +408,20 @@ if (!function_exists('sendAcceptWhatsAppNotification')) {
             $wa_message .= "• *Drop:* {$to}\n";
         }
         $wa_message .= "• *Date & Time:* {$date} at {$time}\n" .
-                       "• *Amount:* ₹{$amount}\n\n" .
-                       "🚖 *Driver & Vehicle Details:*\n" .
+                       "• *Total Fare:* ₹" . number_format($amount, 2) . "\n";
+        if ($paid_amount > 0) {
+            $wa_message .= "• *Advance Paid Online:* ₹" . number_format($paid_amount, 2) . " ✅\n" .
+                           "• *Balance Cash to Driver:* ₹" . number_format($remaining_balance, 2) . "\n";
+        } else {
+            $wa_message .= "• *Payment Mode:* Cash to Driver (at trip end)\n";
+        }
+        $wa_message .= "\n🚖 *Driver & Vehicle Details:*\n" .
                        "• *Driver Name:* {$driver_name}\n" .
                        "• *Driver Phone:* {$driver_phone}\n" .
                        "• *Vehicle Plate:* {$vehicle_id}\n\n" .
-                       "The driver will reach your location on time. Please contact them if needed. Have a safe and happy journey! 🙏";
+                       "📲 *View Live Trip Details & OTP:*\n" .
+                       "👉 {$tracking_link}\n\n" .
+                       "The driver will reach your location on time. Click the link above to view live trip details and show your OTP to the driver at pickup. Have a safe and happy journey! 🙏";
 
         // Email body (HTML)
         $email_subject = "Booking Confirmed! - ID #{$booking_id}";
@@ -413,7 +456,19 @@ if (!function_exists('sendAcceptWhatsAppNotification')) {
                 <tr>
                     <td style="padding: 8px 0; font-weight: bold; color: #4b5563; border-bottom: 1px solid #f3f4f6;">Total Amount:</td>
                     <td style="padding: 8px 0; font-weight: bold; color: #10b981; border-bottom: 1px solid #f3f4f6;">₹' . number_format($amount, 2) . '</td>
+                </tr>';
+        if ($paid_amount > 0) {
+            $email_body .= '
+                <tr>
+                    <td style="padding: 8px 0; font-weight: bold; color: #4b5563; border-bottom: 1px solid #f3f4f6;">Advance Paid:</td>
+                    <td style="padding: 8px 0; font-weight: bold; color: #0284c7; border-bottom: 1px solid #f3f4f6;">₹' . number_format($paid_amount, 2) . ' (Online)</td>
                 </tr>
+                <tr>
+                    <td style="padding: 8px 0; font-weight: bold; color: #4b5563; border-bottom: 1px solid #f3f4f6;">Cash to Driver:</td>
+                    <td style="padding: 8px 0; font-weight: bold; color: #d97706; border-bottom: 1px solid #f3f4f6;">₹' . number_format($remaining_balance, 2) . '</td>
+                </tr>';
+        }
+        $email_body .= '
             </table>
 
             <h3 style="color: #374151; margin-top: 25px; font-size: 16px;">🚖 Driver & Vehicle Details:</h3>
@@ -432,7 +487,13 @@ if (!function_exists('sendAcceptWhatsAppNotification')) {
                 </tr>
             </table>
             
-            <p style="font-size: 15px; line-height: 1.5; margin-top: 25px;">The driver will reach your location on time. Please contact them if needed. Have a safe and happy journey! 🙏</p>
+            <div style="text-align: center; margin: 25px 0;">
+                <a href="' . $tracking_link . '" style="background-color: #FFB300; color: #1f2937; font-weight: bold; text-decoration: none; padding: 12px 26px; border-radius: 8px; display: inline-block; font-size: 14px;">
+                    📲 Track Driver & View OTP
+                </a>
+            </div>
+            
+            <p style="font-size: 15px; line-height: 1.5; margin-top: 15px;">The driver will reach your location on time. Please contact them if needed. Have a safe and happy journey! 🙏</p>
             <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">
             <p style="font-size: 12px; color: #9ca3af; text-align: center;">&copy; 2026 Rentox Car Rental. All rights reserved.</p>
         </div>

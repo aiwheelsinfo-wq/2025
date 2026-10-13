@@ -420,6 +420,19 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Round-
         }
 
         if (!empty($vPhone) && $totalDeductionAmount > 0) {
+            // Check if customer paid advance online for this trip
+            $advancePaid = 0.00;
+            $bAdvQ = $conn->query("SELECT paid_amount, payment_status, payment_type FROM bookings WHERE id = '" . mysqli_real_escape_string($conn, $booking_id) . "' LIMIT 1");
+            if ($bAdvQ && $advRow = $bAdvQ->fetch_assoc()) {
+                $pStatus = strtolower(trim($advRow['payment_status'] ?? ''));
+                if (in_array($pStatus, ['advance_paid', 'advance paid', 'paid', 'success']) || ($advRow['payment_type'] ?? '') === 'Advance') {
+                    $advancePaid = floatval($advRow['paid_amount'] ?? 0);
+                }
+            }
+
+            // Net wallet deduction = Commission minus Advance already collected by Rentox
+            $netDeductionAmount = max(0.00, round($totalDeductionAmount - $advancePaid, 2));
+
             $balBefore = 0.00;
             $wQ = $conn->query("SELECT wallet_balance FROM drivers WHERE phone_number = '" . mysqli_real_escape_string($conn, $vPhone) . "' LIMIT 1");
             if ($wQ && $wrow = $wQ->fetch_assoc()) {
@@ -430,21 +443,28 @@ if (strcasecmp($trip_type, 'Round-Trip') === 0 || strcasecmp($trip_type, 'Round-
                     $balBefore = (float)$vwrow['wallet_balance'];
                 }
             }
-            $balAfter = $balBefore - $totalDeductionAmount;
+            $balAfter = $balBefore - $netDeductionAmount;
 
-            // Deduct from drivers and vendors
-            $safePhone = mysqli_real_escape_string($conn, $vPhone);
-            $conn->query("UPDATE drivers SET wallet_balance = wallet_balance - $totalDeductionAmount WHERE phone_number = '$safePhone'");
-            $conn->query("UPDATE vendors SET wallet_balance = wallet_balance - $totalDeductionAmount WHERE phone_number = '$safePhone'");
+            if ($netDeductionAmount > 0) {
+                // Deduct remaining difference from drivers and vendors
+                $safePhone = mysqli_real_escape_string($conn, $vPhone);
+                $conn->query("UPDATE drivers SET wallet_balance = wallet_balance - $netDeductionAmount WHERE phone_number = '$safePhone'");
+                $conn->query("UPDATE vendors SET wallet_balance = wallet_balance - $netDeductionAmount WHERE phone_number = '$safePhone'");
+
+                $shareDesc = ($companyShareType === 'fixed') ? "₹" . number_format($companyShareValue, 2) : number_format($companyShareValue, 1) . "%";
+                $desc = "Platform Commission (" . $shareDesc . ": ₹" . number_format($commissionAmount, 0) . ") + 5% GST (₹" . number_format($gstAmount, 0) . ") for One-Way Trip #" . $booking_id . " [₹" . number_format($advancePaid, 0) . " covered by customer advance, ₹" . number_format($netDeductionAmount, 0) . " wallet deducted]";
+                $tType = 'trip_commission_deduct';
+            } else {
+                // Full commission covered by Customer Advance online: ₹0 wallet deduction!
+                $desc = "Platform Commission (₹" . number_format($commissionAmount, 0) . ") fully covered by Customer Advance online (₹" . number_format($advancePaid, 0) . "). Driver Wallet deduction: ₹0 for One-Way Trip #" . $booking_id;
+                $tType = 'advance_covered';
+            }
 
             // Record transaction ledger
-            $shareDesc = ($companyShareType === 'fixed') ? "₹" . number_format($companyShareValue, 2) : number_format($companyShareValue, 1) . "%";
-            $desc = "Platform Commission (" . $shareDesc . ": ₹" . number_format($commissionAmount, 0) . ") + 5% GST (₹" . number_format($gstAmount, 0) . ") for One-Way Trip #" . $booking_id;
-            $tType = 'trip_commission_deduct';
             $logStmt = $conn->prepare("INSERT INTO vendor_wallet_transactions (vendor_phone, booking_id, transaction_type, amount, balance_before, balance_after, description) VALUES (?, ?, ?, ?, ?, ?, ?)");
             if ($logStmt) {
                 $bIdInt = (int)$booking_id;
-                $logStmt->bind_param("sisddds", $vPhone, $bIdInt, $tType, $totalDeductionAmount, $balBefore, $balAfter, $desc);
+                $logStmt->bind_param("sisddds", $vPhone, $bIdInt, $tType, $netDeductionAmount, $balBefore, $balAfter, $desc);
                 $logStmt->execute();
                 $logStmt->close();
             }

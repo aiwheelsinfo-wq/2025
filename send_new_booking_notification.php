@@ -590,6 +590,12 @@ function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon
         $bodyText = str_replace(array_keys($replacements), array_values($replacements), $body_template);
         $bodyText = str_replace(['\\r\\n', '\\n', '\\r'], "\n", $bodyText);
 
+        $advPaidFloat = floatval($booking['paid_amount'] ?? 0);
+        $remBalFloat = floatval($booking['remaining_balance'] ?? ($booking['total_amount'] ?? 0));
+        if ($advPaidFloat > 0) {
+            $bodyText .= "\n💳 Advance Paid: ₹" . number_format($advPaidFloat, 0) . " | 💵 Cash to Collect: ₹" . number_format($remBalFloat, 0);
+        }
+
         // Build dynamic FCM vibration timings array for Android
         $vibrate_timings = ['0.0s'];
         $elapsed = 0.0;
@@ -616,6 +622,10 @@ function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon
     $keyFileContent = json_decode(file_get_contents(__DIR__ . '/agni-car-app-firebase-adminsdk-fbsvc-4f70f7d1f2.json'), true);
     $projectId = $keyFileContent['project_id'] ?? 'agnicarrentaldriver-8fb07';
 
+    $advPaidVal = (string)($booking['paid_amount'] ?? '0.00');
+    $remBalVal = (string)($booking['remaining_balance'] ?? ($booking['total_amount'] ?? '0.00'));
+    $totAmtVal = (string)($booking['total_amount'] ?? '0.00');
+
     $notificationData = [
         'title' => $titleText,
         'body' => $bodyText,
@@ -632,6 +642,10 @@ function trigger_new_booking_notification($booking_id, $ref_lat = null, $ref_lon
             'drop_location' => $drop_location,
             'distance' => (string)$distance,
             'vendor_amount' => (string)$vendor_amount,
+            'total_amount' => $totAmtVal,
+            'paid_amount' => $advPaidVal,
+            'remaining_balance' => $remBalVal,
+            'payment_type' => (string)($booking['payment_type'] ?? 'Pay to Driver'),
             'km_rate' => (string)$km_rate,
             'countdown_seconds' => (string)$effective_countdown,
             'vibrate_seconds' => $is_advance_booking ? '1' : (string)$vibration_duration_sec,

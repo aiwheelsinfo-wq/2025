@@ -180,6 +180,29 @@ class OneWayFareCalculator {
             'is_veh_override' => ($vehShareOverride > 0)
         ];
 
+        // 11. Customer Advance Payment Calculation (Mode 2)
+        $advancePaymentActive = !empty($global['advance_payment_active']);
+        $advancePaymentType = $global['advance_payment_type'] ?? 'percentage';
+        $advancePaymentValue = (float)($global['advance_payment_value'] ?? 10.0);
+
+        $advanceAmountP = 0;
+        if ($advancePaymentActive && $advancePaymentValue > 0) {
+            if ($advancePaymentType === 'fixed') {
+                $advanceAmountP = min($finalFareP, self::toPaise($advancePaymentValue));
+            } else {
+                $advanceAmountP = self::pctOf($finalFareP, $advancePaymentValue);
+            }
+        }
+        $remainingBalanceP = max(0, $finalFareP - $advanceAmountP);
+
+        $advanceBreakdown = [
+            'is_active'         => $advancePaymentActive,
+            'type'              => $advancePaymentType,
+            'value'             => $advancePaymentValue,
+            'advance_amount'    => self::fromPaise($advanceAmountP),
+            'remaining_balance' => self::fromPaise($remainingBalanceP),
+        ];
+
         return [
             'master_engine_active'    => (bool)($global['master_engine_active'] ?? true),
             'car_type'                => $vehRule['car_type_label'] ?? (string)$carType,
@@ -204,6 +227,10 @@ class OneWayFareCalculator {
             'company_share_amount'    => self::fromPaise($companyShareP),
             'driver_payout_amount'    => self::fromPaise($driverPayoutP),
             'company_share_breakdown' => $companyShareBreakdown,
+            'advance_payment_active'  => $advancePaymentActive,
+            'advance_amount'          => self::fromPaise($advanceAmountP),
+            'remaining_balance'       => self::fromPaise($remainingBalanceP),
+            'advance_breakdown'       => $advanceBreakdown,
         ];
     }
 
@@ -630,6 +657,9 @@ class OneWayFareCalculator {
             'company_share_type'         => 'percentage',
             'company_share_value'        => 15.0,
             'company_share_basis'        => 'subtotal',
+            'advance_payment_active'     => 0,
+            'advance_payment_type'       => 'percentage',
+            'advance_payment_value'      => 10.0,
             'row_version'                => 1
         ];
     }

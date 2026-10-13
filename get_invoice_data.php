@@ -34,6 +34,32 @@ if ($result->num_rows === 0) {
 
 $data = $result->fetch_assoc();
 
+// Generate secure tracking token for verification
+$expected_token = substr(hash('sha256', $data['id'] . $data['mobile'] . 'rentox_salt_2026'), 0, 16);
+$data['tracking_token'] = $expected_token;
+
+// Security Ownership Check (if caller provides phone number)
+$req_phone = trim($_GET['phone'] ?? '');
+$req_token = trim($_GET['token'] ?? '');
+
+if (!empty($req_phone)) {
+    $clean_req    = substr(preg_replace('/[^0-9]/', '', $req_phone), -10);
+    $clean_owner  = substr(preg_replace('/[^0-9]/', '', $data['mobile']), -10);
+    $clean_booker = substr(preg_replace('/[^0-9]/', '', $data['booker_id'] ?? ''), -10);
+
+    if ($clean_req !== $clean_owner && $clean_req !== $clean_booker) {
+        if (empty($req_token) || $req_token !== $expected_token) {
+            http_response_code(403);
+            echo json_encode([
+                'error' => 'Unauthorized: This booking belongs to another mobile number.',
+                'unauthorized' => true,
+                'booking_mobile_masked' => substr($clean_owner, 0, 5) . '*****'
+            ]);
+            exit;
+        }
+    }
+}
+
 // If booked by an agent, get agent agency & contact info
 if (!empty($data['booker_id'])) {
     $agent_stmt = $conn->prepare("SELECT agency_name, name AS agent_name, email AS agent_email, city AS agent_city, pincode AS agent_pincode, phone_number AS agent_phone, accountType AS agent_accountType FROM users WHERE phone_number = ?");

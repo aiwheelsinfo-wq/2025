@@ -554,6 +554,7 @@ try {
             "driver_name" => $driver_name,
             "vendor_name" => $vendor_name,
             "paid_amount" => $paid_amount,
+            "remaining_balance" => round(max(0.0, (float)$total_amount - (float)$paid_amount), 2),
             "payment_type" => $payment_type
         ];
     }

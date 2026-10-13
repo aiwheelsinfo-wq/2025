@@ -46,13 +46,8 @@ $booking_info = mysqli_fetch_assoc($booking_query);
 $trip_type = $booking_info['trip_type'] ?? '';
 
 if ($status === 'success') {
-    if ($trip_type === 'Round-Trip') {
-        $payment_status_db = 'Advance Paid';
-        $booking_status_db = 'Pending';
-    } else {
-        $payment_status_db = 'success';
-        $booking_status_db = 'Pending';
-    }
+    $payment_status_db = 'Advance Paid';
+    $booking_status_db = 'Pending';
 } else {
     $payment_status_db = 'Failed';
     $booking_status_db = 'Failed';
@@ -62,6 +57,8 @@ $sql = "UPDATE bookings
         SET payment_id = '$payment_id', 
             payment_status = '$payment_status_db', 
             paid_amount = '$amount', 
+            remaining_balance = GREATEST(0, total_amount - '$amount'),
+            payment_type = 'Advance',
             booking_status = '$booking_status_db'
         WHERE id = '$booking_id'";
 

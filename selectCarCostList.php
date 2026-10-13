@@ -244,6 +244,10 @@ if ($tripType === 'One-way') {
                 'company_share_amount' => (string)number_format($calcRes['company_share_amount'], 2, '.', ''),
                 'driver_payout_amount' => (string)number_format($calcRes['driver_payout_amount'], 2, '.', ''),
                 'dynamic_pricing' => $calcRes['dynamic_pricing'] ?? null,
+                'advance_payment_active' => !empty($calcRes['advance_payment_active']) ? 1 : 0,
+                'advance_amount' => (string)number_format($calcRes['advance_amount'] ?? 0, 2, '.', ''),
+                'remaining_balance' => (string)number_format($calcRes['remaining_balance'] ?? $finalFare, 2, '.', ''),
+                'advance_breakdown' => $calcRes['advance_breakdown'] ?? null,
             ];
         }
 
